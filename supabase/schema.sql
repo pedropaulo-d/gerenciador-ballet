@@ -10,13 +10,10 @@ create extension if not exists "uuid-ossp";
 -- ============================================
 create table locations (
   id            uuid primary key default uuid_generate_v4(),
-  name          text not null,
-  address       text,
-  contact_name  text,
-  contact_phone text,
-  -- Taxa de repasse: percentual (ex: 20.00 = 20%) OU valor fixo
-  fee_type      text not null check (fee_type in ('percentage', 'fixed')) default 'percentage',
-  fee_value     numeric(10,2) not null default 0,
+  name            text not null,
+  address         text,
+  -- Taxa de repasse fixa por aluna matriculada (em R$)
+  fee_per_student numeric(10,2) not null default 0,
   is_active     boolean not null default true,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
@@ -29,7 +26,7 @@ create table classes (
   id           uuid primary key default uuid_generate_v4(),
   location_id  uuid not null references locations(id) on delete cascade,
   name         text not null,
-  day_of_week  smallint not null check (day_of_week between 0 and 6), -- 0=Dom, 6=Sáb
+  days_of_week smallint[] not null default '{}', -- array de dias: 0=Dom, 6=Sáb
   start_time   time not null,
   end_time     time not null,
   max_students smallint,

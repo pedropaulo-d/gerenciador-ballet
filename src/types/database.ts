@@ -4,7 +4,6 @@
 
 // ---------- Enums ----------
 
-export type FeeType = 'percentage' | 'fixed';
 export type EnrollmentStatus = 'active' | 'inactive' | 'pending';
 export type ValidityType = 'semester' | 'annual';
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
@@ -22,10 +21,7 @@ export interface Location extends Timestamps {
   id: string;
   name: string;
   address: string | null;
-  contact_name: string | null;
-  contact_phone: string | null;
-  fee_type: FeeType;
-  fee_value: number;
+  fee_per_student: number;
   is_active: boolean;
 }
 
@@ -33,7 +29,7 @@ export interface Class extends Timestamps {
   id: string;
   location_id: string;
   name: string;
-  day_of_week: number; // 0 = Dom, 6 = Sáb
+  days_of_week: number[]; // 0 = Dom, 6 = Sáb
   start_time: string;  // HH:mm:ss
   end_time: string;
   max_students: number | null;
