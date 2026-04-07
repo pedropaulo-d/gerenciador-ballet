@@ -82,7 +82,7 @@ export function ImportTool() {
           Importar Alunas (CSV)
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Ferramenta temporária para migração inicial de dados.
+          Ferramenta para importar alunas via arquivo CSV.
         </p>
       </div>
 
