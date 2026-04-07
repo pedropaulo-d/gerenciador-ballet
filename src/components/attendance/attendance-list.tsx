@@ -2,6 +2,7 @@
 
 import type { AttendanceRow, AttendanceStatus } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { CheckIcon, XIcon, AlertTriangleIcon, LoaderIcon, SaveIcon, ClipboardListIcon } from "lucide-react";
@@ -35,7 +36,9 @@ const STATUS_OPTIONS: {
 interface AttendanceListProps {
   rows: AttendanceRow[];
   values: Map<string, AttendanceStatus>;
+  justifications: Map<string, string>;
   onStatusChange: (enrollmentId: string, status: AttendanceStatus) => void;
+  onJustificationChange: (enrollmentId: string, text: string) => void;
   onSave: () => void;
   saving: boolean;
   hasClass: boolean;
@@ -44,7 +47,9 @@ interface AttendanceListProps {
 export function AttendanceList({
   rows,
   values,
+  justifications,
   onStatusChange,
+  onJustificationChange,
   onSave,
   saving,
   hasClass,
@@ -78,33 +83,44 @@ export function AttendanceList({
 
       {rows.map((row) => {
         const current = values.get(row.enrollmentId) ?? null;
+        const showJustification = current === "justified";
 
         return (
           <Card key={row.enrollmentId} size="sm">
-            <CardContent className="flex items-center justify-between gap-3 py-3">
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                {row.studentName}
-              </span>
-              <div className="flex gap-1.5">
-                {STATUS_OPTIONS.map((opt) => {
-                  const isActive = current === opt.value;
-                  return (
-                    <Button
-                      key={opt.value}
-                      variant="outline"
-                      size="icon-xs"
-                      className={cn(
-                        "size-9 rounded-full transition-colors",
-                        isActive && opt.activeClass
-                      )}
-                      onClick={() => onStatusChange(row.enrollmentId, opt.value)}
-                    >
-                      <opt.icon className="size-4" />
-                      <span className="sr-only">{opt.label}</span>
-                    </Button>
-                  );
-                })}
+            <CardContent className="flex flex-col gap-2 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  {row.studentName}
+                </span>
+                <div className="flex gap-1.5">
+                  {STATUS_OPTIONS.map((opt) => {
+                    const isActive = current === opt.value;
+                    return (
+                      <Button
+                        key={opt.value}
+                        variant="outline"
+                        size="icon-xs"
+                        className={cn(
+                          "size-9 rounded-full transition-colors",
+                          isActive && opt.activeClass
+                        )}
+                        onClick={() => onStatusChange(row.enrollmentId, opt.value)}
+                      >
+                        <opt.icon className="size-4" />
+                        <span className="sr-only">{opt.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
               </div>
+              {showJustification && (
+                <Input
+                  placeholder="Qual o motivo da falta?"
+                  value={justifications.get(row.enrollmentId) ?? ""}
+                  onChange={(e) => onJustificationChange(row.enrollmentId, e.target.value)}
+                  className="text-sm"
+                />
+              )}
             </CardContent>
           </Card>
         );

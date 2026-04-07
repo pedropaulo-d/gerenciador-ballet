@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type {
@@ -26,6 +26,7 @@ import { StudentsTable } from "@/components/students/students-table";
 import { StudentPagination } from "@/components/students/student-pagination";
 import { StudentFormDialog } from "@/components/students/student-form-dialog";
 import { StudentDeleteDialog } from "@/components/students/student-delete-dialog";
+import { StudentProfileSheet } from "@/components/students/student-profile-sheet";
 import { Button } from "@/components/ui/button";
 import { PlusIcon, UploadIcon } from "lucide-react";
 import Link from "next/link";
@@ -43,12 +44,13 @@ export function StudentList() {
   const urlClassId = searchParams.get("class") ?? ALL;
   const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
 
+  const [isPending, startTransition] = useTransition();
+
   // Data
   const [students, setStudents] = useState<StudentWithEnrollments[]>([]);
   const [total, setTotal] = useState(0);
   const [locations, setLocations] = useState<Location[]>([]);
   const [classes, setClasses] = useState<ClassWithLocation[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -57,6 +59,7 @@ export function StudentList() {
     useState<StudentWithEnrollments | null>(null);
   const [deletingStudent, setDeletingStudent] =
     useState<StudentWithEnrollments | null>(null);
+  const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
 
   // -- URL helpers --
 
@@ -76,34 +79,35 @@ export function StudentList() {
 
   // -- Data fetching --
 
-  const fetchOptions = useCallback(async () => {
-    const [locRes, clsRes] = await Promise.all([
-      getLocations(),
-      getClassesWithLocation(),
-    ]);
-    if (locRes.success) setLocations(locRes.data);
-    if (clsRes.success) setClasses(clsRes.data);
-  }, []);
-
-  const fetchStudents = useCallback(async () => {
-    setLoading(true);
-    const result = await getStudentsPaginated({
-      search: urlSearch || undefined,
-      locationId: urlLocationId !== ALL ? urlLocationId : undefined,
-      classId: urlClassId !== ALL ? urlClassId : undefined,
-      page: urlPage,
-      pageSize: PAGE_SIZE,
+  useEffect(() => {
+    startTransition(async () => {
+      const [locRes, clsRes] = await Promise.all([
+        getLocations(),
+        getClassesWithLocation(),
+      ]);
+      if (locRes.success) setLocations(locRes.data);
+      if (clsRes.success) setClasses(clsRes.data);
     });
-    if (result.success) {
-      setStudents(result.data.students);
-      setTotal(result.data.total);
-    } else {
-      toast.error("Erro ao carregar alunas", { description: result.error });
-    }
-    setLoading(false);
-  }, [urlSearch, urlLocationId, urlClassId, urlPage]);
+  }, [startTransition]);
 
-  useEffect(() => { fetchOptions(); }, [fetchOptions]);
+  const fetchStudents = useCallback(() => {
+    startTransition(async () => {
+      const result = await getStudentsPaginated({
+        search: urlSearch || undefined,
+        locationId: urlLocationId !== ALL ? urlLocationId : undefined,
+        classId: urlClassId !== ALL ? urlClassId : undefined,
+        page: urlPage,
+        pageSize: PAGE_SIZE,
+      });
+      if (result.success) {
+        setStudents(result.data.students);
+        setTotal(result.data.total);
+      } else {
+        toast.error("Erro ao carregar alunas", { description: result.error });
+      }
+    });
+  }, [urlSearch, urlLocationId, urlClassId, urlPage, startTransition]);
+
   useEffect(() => { fetchStudents(); }, [fetchStudents]);
 
   // -- Filter handlers --
@@ -182,7 +186,7 @@ export function StudentList() {
         onClassChange={(v) => setParams({ class: v })}
       />
 
-      {!loading && (
+      {!isPending && (
         <p className="text-xs text-muted-foreground">
           {total} {total === 1 ? "aluna encontrada" : "alunas encontradas"}
         </p>
@@ -190,10 +194,11 @@ export function StudentList() {
 
       <StudentsTable
         students={students}
-        loading={loading}
+        loading={isPending}
         hasFilters={hasFilters}
         onEdit={(s) => { setEditingStudent(s); setFormDialogOpen(true); }}
         onDelete={(s) => { setDeletingStudent(s); setDeleteDialogOpen(true); }}
+        onViewProfile={(s) => setProfileStudentId(s.id)}
         onCreateFirst={openCreate}
       />
 
@@ -216,6 +221,12 @@ export function StudentList() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDelete}
+      />
+
+      <StudentProfileSheet
+        studentId={profileStudentId}
+        open={profileStudentId !== null}
+        onOpenChange={(open) => !open && setProfileStudentId(null)}
       />
     </div>
   );

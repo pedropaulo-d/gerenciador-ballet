@@ -20,6 +20,8 @@ src/
 │   │   ├── students.ts        # CRUD students + criação unificada student+enrollment
 │   │   ├── financial.ts       # Listagem paginada, geração de mensalidades, baixa manual, desfazer pagamento, lógica de overdue, filtros
 │   │   ├── attendance.ts      # Busca chamada por turma+data, salvamento em lote (upsert)
+│   │   ├── student-profile.ts # getStudentSummary (perfil 360°) + getTodayAbsencesCount
+│   │   ├── dashboard.ts       # getTodayBirthdays (aniversariantes do dia)
 │   │   └── import-students.ts # Importação CSV com matching fuzzy de turmas
 │   ├── api/
 │   │   └── webhooks/
@@ -27,7 +29,7 @@ src/
 │   │           └── route.ts   # Webhook POST Asaas (pagamentos)
 │   ├── (dashboard)/           # Route group com layout (header + fixed 5-item bottom nav + sheet "Mais")
 │   │   ├── page.tsx           # Dashboard home (/)
-│   │   ├── dashboard-home.tsx # Client component do dashboard
+│   │   ├── dashboard-home.tsx # Client component do dashboard (aniversarios + stats + faltas hoje)
 │   │   ├── layout.tsx
 │   │   ├── locations/
 │   │   │   ├── page.tsx
@@ -66,7 +68,10 @@ src/
 │   │   ├── student-form-dialog.tsx
 │   │   ├── student-delete-dialog.tsx
 │   │   ├── student-filters.tsx
-│   │   └── student-pagination.tsx
+│   │   ├── student-pagination.tsx
+│   │   └── student-profile-sheet.tsx  # Sheet 360° (perfil, financeiro, frequência, WhatsApp)
+│   ├── dashboard/
+│   │   └── birthday-card.tsx  # Card de aniversariantes do dia
 │   ├── financial/
 │   │   ├── month-selector.tsx
 │   │   ├── financial-filters.tsx
@@ -93,7 +98,8 @@ supabase/
 |---|---|
 | Locais (CRUD) | Concluído |
 | Turmas (CRUD + filtro por local) | Concluído |
-| Alunas (CRUD + busca + filtros + paginação) | Concluído |
+| Alunas (CRUD + busca + filtros + paginação + perfil 360°) | Concluído |
+| Dashboard (stats, financeiro do mês, faltas hoje) | Concluído |
 | Importação CSV | Concluído |
 | Financeiro (mensalidades, paginação, baixa manual, overdue automático) | Concluído |
 | Webhook Asaas | Estrutura pronta (validação de token pendente) |
@@ -107,7 +113,7 @@ supabase/
 |---|---|
 | `locations` | Escolas/creches parceiras. `fee_per_student` (valor fixo em R$ por aluna) |
 | `classes` | Turmas vinculadas a um location. `days_of_week` (smallint[], múltiplos dias) + horário |
-| `students` | Alunas com dados do responsável e flag `is_internal` |
+| `students` | Alunas com dados do responsável, flag `is_internal`, `medical_notes` e `internal_observations` |
 | `enrollments` | Liga student ↔ class, com status, validade, `base_fee` (valor base da mensalidade) e `due_day` (dia de vencimento: 5 ou 7) |
 | `monthly_fees` | Mensalidades com taxa Asaas, taxa do local e `net_amount` (coluna gerada) |
 | `attendance` | Chamada diária. Status: `present`, `absent`, `justified`. Unique em `(enrollment_id, date)` |
@@ -125,7 +131,9 @@ supabase/
 4. **Financeiro:** O app registra apenas o Valor Base bruto da mensalidade (`base_fee` em enrollments). O cálculo de descontos (ex: 10% até o vencimento) e juros é responsabilidade exclusiva do Asaas. O app concilia o valor líquido recebido via webhook. Coluna `net_amount` em `monthly_fees` é gerada automaticamente (gross - asaas_fee - location_fee). Mensalidades são geradas em lote por mês via `generateFeesForMonth()`. Mensalidades pendentes são automaticamente marcadas como "overdue" quando a data atual ultrapassa o `due_day` do mês de referência. Baixa manual disponível via `payFeeManually()`. **Desfazer pagamento** via `undoPayment()` reverte status para 'pending' e zera `paid_at`, `asaas_fee` e `location_fee`. Filtros avançados por status, local e turma via URL search params.
    - **Cores de status:** Pendente = Laranja (warning), Pago = Verde (success), Vencido = Vermelho (destructive), Cancelado = Cinza (secondary).
 5. **Webhooks Asaas:** Tratados nativamente pelo App Router em `src/app/api/webhooks/asaas/route.ts` (POST). Eventos suportados: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `PAYMENT_DELETED`, `PAYMENT_REFUNDED`. O webhook atualiza `monthly_fees.status`, `asaas_fee` e `paid_at`.
-6. **Chamada (Frequência):** Mobile-First, focada em toques rápidos. Seletores de data (padrão hoje) e turma no topo. Lista de alunas com 3 botões circulares por linha: Presente (verde), Falta (vermelho), Justificada (amarelo). Toggle: clicar no mesmo status desmarca. Salvamento em lote via `saveAttendance()` (upsert por `enrollment_id + date`). Tabela `attendance` com constraint unique `(enrollment_id, date)`.
+6. **Chamada (Frequência):** Mobile-First, focada em toques rápidos. Seletores de data (padrão hoje) e turma no topo. Lista de alunas com 3 botões circulares por linha: Presente (verde), Falta (vermelho), Justificada (amarelo). Toggle: clicar no mesmo status desmarca. Salvamento em lote via `saveAttendance()` (upsert por `enrollment_id + date`). Tabela `attendance` com constraint unique `(enrollment_id, date)`. Campo `justification` (text, nullable) para motivo de falta justificada.
+7. **Perfil 360° da Aluna:** Sheet lateral (`student-profile-sheet.tsx`) acessado via clique no nome da aluna ou botão "Ver Perfil" na tabela. Consolida: dados pessoais, matrícula atual (turma + local), **observações importantes** (médicas e pedagógicas), status financeiro do mês + histórico de inadimplência, frequência do mês (P/F/J), contato do responsável com link clicável para WhatsApp (`wa.me/55...`). Dados via `getStudentSummary()`.
+8. **Dashboard:** Home (`/`) com **alerta de aniversariantes** (card rosa no topo, só aparece se houver), cards de Locais, Turmas e **Faltas Hoje** (com destaque visual vermelho se > 0), resumo financeiro do mês (recebido, pendente, vencido), link rápido para financeiro completo. Aniversários via `getTodayBirthdays()`, faltas via `getTodayAbsencesCount()`.
 
 ## Arquitetura — Padrão para CRUDs
 

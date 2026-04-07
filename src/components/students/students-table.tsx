@@ -20,6 +20,7 @@ import {
   PhoneIcon,
   LoaderIcon,
   SearchIcon,
+  EyeIcon,
 } from "lucide-react";
 
 interface StudentsTableProps {
@@ -28,6 +29,7 @@ interface StudentsTableProps {
   hasFilters: boolean;
   onEdit: (student: StudentWithEnrollments) => void;
   onDelete: (student: StudentWithEnrollments) => void;
+  onViewProfile: (student: StudentWithEnrollments) => void;
   onCreateFirst: () => void;
 }
 
@@ -37,6 +39,7 @@ export function StudentsTable({
   hasFilters,
   onEdit,
   onDelete,
+  onViewProfile,
   onCreateFirst,
 }: StudentsTableProps) {
   if (loading) {
@@ -79,7 +82,13 @@ export function StudentsTable({
           <Card key={student.id} size="sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-1.5">
-                {student.full_name}
+                <button
+                  type="button"
+                  className="text-left hover:underline"
+                  onClick={() => onViewProfile(student)}
+                >
+                  {student.full_name}
+                </button>
                 {!student.is_active && (
                   <Badge variant="secondary">Inativa</Badge>
                 )}
@@ -89,6 +98,13 @@ export function StudentsTable({
               </CardTitle>
               <CardAction>
                 <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => onViewProfile(student)}
+                  >
+                    <EyeIcon />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon-xs"

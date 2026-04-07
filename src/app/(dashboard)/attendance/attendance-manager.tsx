@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type { AttendanceRow, AttendanceStatus, ClassWithLocation } from "@/types/database";
@@ -27,6 +27,7 @@ function todayISO(): string {
 export function AttendanceManager() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   // URL state
   const urlDate = searchParams.get("date") ?? todayISO();
@@ -36,7 +37,7 @@ export function AttendanceManager() {
   const [classes, setClasses] = useState<ClassWithLocation[]>([]);
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [values, setValues] = useState<Map<string, AttendanceStatus>>(new Map());
-  const [loading, setLoading] = useState(false);
+  const [justifications, setJustifications] = useState<Map<string, string>>(new Map());
   const [saving, setSaving] = useState(false);
 
   // URL helpers
@@ -55,35 +56,37 @@ export function AttendanceManager() {
 
   // Load class options
   useEffect(() => {
-    async function loadClasses() {
+    startTransition(async () => {
       const res = await getClassesWithLocation();
       if (res.success) setClasses(res.data);
-    }
-    loadClasses();
-  }, []);
+    });
+  }, [startTransition]);
 
   // Fetch attendance when class or date changes
-  const fetchAttendance = useCallback(async () => {
-    if (urlClassId === NONE) {
-      setRows([]);
-      setValues(new Map());
-      return;
-    }
-    setLoading(true);
-    const result = await getAttendanceByClassAndDate(urlClassId, urlDate);
-    if (result.success) {
-      setRows(result.data);
-      // Initialize values from existing records
-      const initial = new Map<string, AttendanceStatus>();
-      for (const row of result.data) {
-        if (row.status) initial.set(row.enrollmentId, row.status);
+  const fetchAttendance = useCallback(() => {
+    startTransition(async () => {
+      if (urlClassId === NONE) {
+        setRows([]);
+        setValues(new Map());
+        setJustifications(new Map());
+        return;
       }
-      setValues(initial);
-    } else {
-      toast.error("Erro ao carregar chamada", { description: result.error });
-    }
-    setLoading(false);
-  }, [urlClassId, urlDate]);
+      const result = await getAttendanceByClassAndDate(urlClassId, urlDate);
+      if (result.success) {
+        setRows(result.data);
+        const initialValues = new Map<string, AttendanceStatus>();
+        const initialJustifications = new Map<string, string>();
+        for (const row of result.data) {
+          if (row.status) initialValues.set(row.enrollmentId, row.status);
+          if (row.justification) initialJustifications.set(row.enrollmentId, row.justification);
+        }
+        setValues(initialValues);
+        setJustifications(initialJustifications);
+      } else {
+        toast.error("Erro ao carregar chamada", { description: result.error });
+      }
+    });
+  }, [urlClassId, urlDate, startTransition]);
 
   useEffect(() => { fetchAttendance(); }, [fetchAttendance]);
 
@@ -91,11 +94,30 @@ export function AttendanceManager() {
   function handleStatusChange(enrollmentId: string, status: AttendanceStatus) {
     setValues((prev) => {
       const next = new Map(prev);
-      // Toggle off if clicking the same status
       if (next.get(enrollmentId) === status) {
         next.delete(enrollmentId);
       } else {
         next.set(enrollmentId, status);
+      }
+      return next;
+    });
+    // Clear justification when switching away from justified
+    if (status !== "justified") {
+      setJustifications((prev) => {
+        const next = new Map(prev);
+        next.delete(enrollmentId);
+        return next;
+      });
+    }
+  }
+
+  function handleJustificationChange(enrollmentId: string, text: string) {
+    setJustifications((prev) => {
+      const next = new Map(prev);
+      if (text) {
+        next.set(enrollmentId, text);
+      } else {
+        next.delete(enrollmentId);
       }
       return next;
     });
@@ -105,6 +127,7 @@ export function AttendanceManager() {
     const records = Array.from(values.entries()).map(([enrollmentId, status]) => ({
       enrollmentId,
       status,
+      justification: status === "justified" ? (justifications.get(enrollmentId) ?? null) : null,
     }));
 
     setSaving(true);
@@ -146,7 +169,7 @@ export function AttendanceManager() {
         </Select>
       </div>
 
-      {loading ? (
+      {isPending ? (
         <div className="flex items-center justify-center py-12">
           <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
         </div>
@@ -154,7 +177,9 @@ export function AttendanceManager() {
         <AttendanceList
           rows={rows}
           values={values}
+          justifications={justifications}
           onStatusChange={handleStatusChange}
+          onJustificationChange={handleJustificationChange}
           onSave={handleSave}
           saving={saving}
           hasClass={urlClassId !== NONE}

@@ -50,6 +50,8 @@ create table students (
   -- Interna (da creche) ou externa
   is_internal       boolean not null default true,
   notes             text,
+  medical_notes     text, -- observações médicas (alergias, restrições, etc.)
+  internal_observations text, -- observações pedagógicas internas
   is_active         boolean not null default true,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
@@ -103,6 +105,7 @@ create table attendance (
   enrollment_id   uuid not null references enrollments(id) on delete cascade,
   date            date not null,
   status          text not null check (status in ('present', 'absent', 'justified')) default 'present',
+  justification   text, -- motivo da falta justificada (preenchido quando status = 'justified')
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
 

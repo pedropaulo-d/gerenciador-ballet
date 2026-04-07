@@ -16,6 +16,7 @@ type EnrollmentStudentRow = {
 type AttendanceRecord = {
   enrollment_id: string;
   status: AttendanceStatus;
+  justification: string | null;
 };
 
 // ---------- Actions ----------
@@ -48,25 +49,27 @@ export async function getAttendanceByClassAndDate(
     // 2. Get existing attendance records for these enrollments on this date
     const { data: records, error: attError } = await supabase
       .from("attendance")
-      .select("enrollment_id, status")
+      .select("enrollment_id, status, justification")
       .in("enrollment_id", enrollmentIds)
       .eq("date", date);
 
     if (attError) return { success: false, error: attError.message };
 
-    const recordMap = new Map<string, AttendanceStatus>();
+    const recordMap = new Map<string, { status: AttendanceStatus; justification: string | null }>();
     for (const r of (records ?? []) as AttendanceRecord[]) {
-      recordMap.set(r.enrollment_id, r.status);
+      recordMap.set(r.enrollment_id, { status: r.status, justification: r.justification });
     }
 
     // 3. Merge: one row per enrollment
     const rows: AttendanceRow[] = typedEnrollments.map((e) => {
       // Supabase returns object for many-to-one, but handle array as fallback
       const s = Array.isArray(e.student) ? e.student[0] : e.student;
+      const record = recordMap.get(e.id);
       return {
         enrollmentId: e.id,
         studentName: s?.full_name ?? "—",
-        status: recordMap.get(e.id) ?? null,
+        status: record?.status ?? null,
+        justification: record?.justification ?? null,
       };
     });
 
@@ -85,7 +88,7 @@ export async function getAttendanceByClassAndDate(
  */
 export async function saveAttendance(
   date: string,
-  records: { enrollmentId: string; status: AttendanceStatus }[]
+  records: { enrollmentId: string; status: AttendanceStatus; justification?: string | null }[]
 ): Promise<ActionResult> {
   try {
     if (records.length === 0) {
@@ -96,6 +99,7 @@ export async function saveAttendance(
       enrollment_id: r.enrollmentId,
       date,
       status: r.status,
+      justification: r.status === "justified" ? (r.justification?.trim() || null) : null,
     }));
 
     const { error } = await supabase

@@ -47,6 +47,8 @@ export interface Student extends Timestamps {
   guardian_cpf: string | null;
   is_internal: boolean;
   notes: string | null;
+  medical_notes: string | null;
+  internal_observations: string | null;
   is_active: boolean;
 }
 
@@ -80,6 +82,7 @@ export interface Attendance extends Timestamps {
   enrollment_id: string;
   date: string; // YYYY-MM-DD
   status: AttendanceStatus;
+  justification: string | null;
 }
 
 // ---------- Insert types (omitem campos gerados) ----------
@@ -92,8 +95,10 @@ export type ClassInsert = Omit<Class, 'id' | 'created_at' | 'updated_at'> & {
   id?: string;
 };
 
-export type StudentInsert = Omit<Student, 'id' | 'created_at' | 'updated_at'> & {
+export type StudentInsert = Omit<Student, 'id' | 'created_at' | 'updated_at' | 'medical_notes' | 'internal_observations'> & {
   id?: string;
+  medical_notes?: string | null;
+  internal_observations?: string | null;
 };
 
 export type EnrollmentInsert = Omit<Enrollment, 'id' | 'created_at' | 'updated_at'> & {
@@ -145,4 +150,5 @@ export interface AttendanceRow {
   enrollmentId: string;
   studentName: string;
   status: AttendanceStatus | null;
+  justification: string | null;
 }
