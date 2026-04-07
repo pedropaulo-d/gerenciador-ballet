@@ -27,7 +27,8 @@ import { StudentPagination } from "@/components/students/student-pagination";
 import { StudentFormDialog } from "@/components/students/student-form-dialog";
 import { StudentDeleteDialog } from "@/components/students/student-delete-dialog";
 import { Button } from "@/components/ui/button";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, UploadIcon } from "lucide-react";
+import Link from "next/link";
 
 const PAGE_SIZE = 10;
 const ALL = "__all__";
@@ -156,10 +157,18 @@ export function StudentList() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl font-semibold">Alunas</h1>
-        <Button onClick={openCreate} size="sm">
-          <PlusIcon data-icon="inline-start" />
-          Nova Aluna
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/import">
+              <UploadIcon className="size-4" />
+              Importar
+            </Link>
+          </Button>
+          <Button onClick={openCreate} size="sm">
+            <PlusIcon data-icon="inline-start" />
+            Nova Aluna
+          </Button>
+        </div>
       </div>
 
       <StudentFilters

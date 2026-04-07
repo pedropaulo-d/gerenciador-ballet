@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx shadcn@latest add table button input label dialog select card separator badge --yes)"
+      "Bash(npx shadcn@latest add table button input label dialog select card separator badge --yes)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

@@ -20,16 +20,40 @@ export type FinancialPageData = {
   summary: FinancialSummary;
 };
 
+// ---------- Query-specific row shapes ----------
+
+/** Shape returned by markOverdueFees select: "id, enrollment:enrollments(due_day)" */
+type PendingFeeRow = {
+  id: string;
+  enrollment: { due_day: number }[];
+};
+
+/** Shape returned by generateFeesForMonth select: "id, base_fee, class:classes(location:locations(fee_per_student))" */
+type EnrollmentWithLocationFee = {
+  id: string;
+  base_fee: number;
+  class: { location: { fee_per_student: number }[] }[];
+};
+
+// ---------- Filter types ----------
+
+export type FinancialFilters = {
+  status?: string;
+  locationId?: string;
+  classId?: string;
+};
+
 // ---------- Actions ----------
 
 /**
- * Fetch monthly fees for a given month with pagination and full enrollment details.
+ * Fetch monthly fees for a given month with pagination, filters, and full enrollment details.
  * Also auto-marks pending fees as overdue based on enrollment.due_day.
  */
 export async function getFinancialByMonth(
   referenceMonth: string,
   page = 1,
-  pageSize = 15
+  pageSize = 15,
+  filters?: FinancialFilters
 ): Promise<ActionResult<FinancialPageData>> {
   try {
     // Auto-mark overdue fees before fetching
@@ -38,13 +62,57 @@ export async function getFinancialByMonth(
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    const { data, error, count } = await supabase
+    // Pre-filter enrollment IDs when filtering by location or class.
+    // Supabase PostgREST can't filter parent rows by nested relations,
+    // so we resolve the IDs first and use .in() on enrollment_id.
+    let enrollmentIds: string[] | null = null;
+
+    if (filters?.classId || filters?.locationId) {
+      let enrollQuery = supabase
+        .from("enrollments")
+        .select("id, class:classes(location_id)");
+
+      if (filters.classId) {
+        enrollQuery = enrollQuery.eq("class_id", filters.classId);
+      }
+
+      const { data: enrollRows } = await enrollQuery;
+
+      if (enrollRows) {
+        const filtered = filters.locationId
+          ? enrollRows.filter(
+              (e: Record<string, unknown>) =>
+                (e.class as Record<string, unknown> | null)?.location_id === filters.locationId
+            )
+          : enrollRows;
+        enrollmentIds = filtered.map((e: Record<string, unknown>) => e.id as string);
+      } else {
+        enrollmentIds = [];
+      }
+    }
+
+    let query = supabase
       .from("monthly_fees")
       .select(
         "*, enrollment:enrollments(*, student:students(*), class:classes(*, location:locations(*)))",
         { count: "exact" }
       )
-      .eq("reference_month", referenceMonth)
+      .eq("reference_month", referenceMonth);
+
+    if (filters?.status) {
+      query = query.eq("status", filters.status);
+    }
+
+    if (enrollmentIds !== null) {
+      if (enrollmentIds.length === 0) {
+        // No matching enrollments — return empty
+        const summary = await computeSummary(referenceMonth);
+        return { success: true, data: { fees: [], total: 0, summary } };
+      }
+      query = query.in("enrollment_id", enrollmentIds);
+    }
+
+    const { data, error, count } = await query
       .order("created_at")
       .range(from, to);
 
@@ -85,8 +153,8 @@ async function markOverdueFees(referenceMonth: string): Promise<void> {
   if (!pendingFees || pendingFees.length === 0) return;
 
   const overdueIds: string[] = [];
-  for (const fee of pendingFees as any[]) {
-    const dueDay = fee.enrollment?.due_day ?? 5;
+  for (const fee of pendingFees as PendingFeeRow[]) {
+    const dueDay = fee.enrollment?.[0]?.due_day ?? 5;
     const dueDate = new Date(year, month - 1, dueDay, 23, 59, 59);
     if (now > dueDate) {
       overdueIds.push(fee.id);
@@ -174,11 +242,11 @@ export async function generateFeesForMonth(
       status: string;
     }> = [];
 
-    for (const enrollment of enrollments as any[]) {
+    for (const enrollment of enrollments as EnrollmentWithLocationFee[]) {
       if (existingIds.has(enrollment.id)) continue;
 
       const locationFee =
-        enrollment.class?.location?.fee_per_student ?? 0;
+        enrollment.class?.[0]?.location?.[0]?.fee_per_student ?? 0;
 
       toInsert.push({
         enrollment_id: enrollment.id,
@@ -207,6 +275,30 @@ export async function generateFeesForMonth(
     };
   } catch {
     return { success: false, error: "Falha ao gerar mensalidades." };
+  }
+}
+
+/**
+ * Undo a paid fee: revert status to pending and clear payment fields.
+ */
+export async function undoPayment(
+  feeId: string
+): Promise<ActionResult> {
+  try {
+    const { error } = await supabase
+      .from("monthly_fees")
+      .update({
+        status: "pending",
+        paid_at: null,
+        asaas_fee: 0,
+        location_fee: 0,
+      })
+      .eq("id", feeId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: null };
+  } catch {
+    return { success: false, error: "Falha ao desfazer pagamento." };
   }
 }
 

@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import type { MonthlyFeeWithDetails } from "@/types/database";
+import type { MonthlyFeeWithDetails, Location, ClassWithLocation } from "@/types/database";
 import {
   getFinancialByMonth,
   generateFeesForMonth,
   payFeeManually,
+  undoPayment,
   type FinancialSummary as SummaryData,
+  type FinancialFilters,
 } from "@/app/actions/financial";
+import { getLocations } from "@/app/actions/locations";
+import { getClassesWithLocation } from "@/app/actions/classes";
 import { MonthSelector } from "@/components/financial/month-selector";
 import { FinancialSummary } from "@/components/financial/financial-summary";
+import { FinancialFilters as FinancialFiltersUI } from "@/components/financial/financial-filters";
 import { FeesTable } from "@/components/financial/fees-table";
 import { FeesPagination } from "@/components/financial/fees-pagination";
 import { PayFeeDialog } from "@/components/financial/pay-fee-dialog";
@@ -18,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { LoaderIcon, PlusCircleIcon } from "lucide-react";
 
 const PAGE_SIZE = 15;
+const ALL = "__all__";
 
 function getCurrentMonth(): string {
   const now = new Date();
@@ -33,41 +40,86 @@ const emptySummary: SummaryData = {
 };
 
 export function FinancesList() {
-  const [month, setMonth] = useState(getCurrentMonth);
-  const [page, setPage] = useState(1);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+
+  // URL state
+  const urlMonth = searchParams.get("month") ?? getCurrentMonth();
+  const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
+  const urlStatus = searchParams.get("status") ?? ALL;
+  const urlLocationId = searchParams.get("location") ?? ALL;
+  const urlClassId = searchParams.get("class") ?? ALL;
+
+  // Data
   const [fees, setFees] = useState<MonthlyFeeWithDetails[]>([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<SummaryData>(emptySummary);
-  const [loading, setLoading] = useState(true);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [classes, setClasses] = useState<ClassWithLocation[]>([]);
   const [generating, setGenerating] = useState(false);
   const [payingFee, setPayingFee] = useState<MonthlyFeeWithDetails | null>(null);
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const result = await getFinancialByMonth(month, page, PAGE_SIZE);
-    if (result.success) {
-      setFees(result.data.fees);
-      setTotal(result.data.total);
-      setSummary(result.data.summary);
-    } else {
-      toast.error("Erro ao carregar financeiro", { description: result.error });
-    }
-    setLoading(false);
-  }, [month, page]);
+  // Derive filters from URL (no state needed)
+  const filters: FinancialFilters = useMemo(() => ({
+    status: urlStatus !== ALL ? urlStatus : undefined,
+    locationId: urlLocationId !== ALL ? urlLocationId : undefined,
+    classId: urlClassId !== ALL ? urlClassId : undefined,
+  }), [urlStatus, urlLocationId, urlClassId]);
 
+  // -- URL helpers --
+
+  const setParams = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(updates)) {
+        if (!value || value === ALL) params.delete(key);
+        else params.set(key, value);
+      }
+      if (!("page" in updates)) params.delete("page");
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : "/finances", { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  // -- Data fetching via startTransition (no sync setState in effects) --
+
+  const fetchData = useCallback(() => {
+    startTransition(async () => {
+      const result = await getFinancialByMonth(urlMonth, urlPage, PAGE_SIZE, filters);
+      if (result.success) {
+        setFees(result.data.fees);
+        setTotal(result.data.total);
+        setSummary(result.data.summary);
+      } else {
+        toast.error("Erro ao carregar financeiro", { description: result.error });
+      }
+    });
+  }, [urlMonth, urlPage, filters, startTransition]);
+
+  // Load filter options once
+  useEffect(() => {
+    startTransition(async () => {
+      const [locRes, clsRes] = await Promise.all([
+        getLocations(),
+        getClassesWithLocation(),
+      ]);
+      if (locRes.success) setLocations(locRes.data);
+      if (clsRes.success) setClasses(clsRes.data);
+    });
+  }, [startTransition]);
+
+  // Re-fetch when URL params change
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Reset page when month changes
-  function handleMonthChange(newMonth: string) {
-    setMonth(newMonth);
-    setPage(1);
-  }
+  // -- Handlers --
 
   async function handleGenerate() {
     setGenerating(true);
-    const result = await generateFeesForMonth(month);
+    const result = await generateFeesForMonth(urlMonth);
     setGenerating(false);
 
     if (!result.success) {
@@ -86,7 +138,7 @@ export function FinancesList() {
       });
     }
 
-    setPage(1);
+    setParams({ page: undefined });
     fetchData();
   }
 
@@ -97,6 +149,16 @@ export function FinancesList() {
       fetchData();
     } else {
       toast.error("Erro ao registrar pagamento", { description: result.error });
+    }
+  }
+
+  async function handleUndoPayment(feeId: string) {
+    const result = await undoPayment(feeId);
+    if (result.success) {
+      toast.success("Pagamento desfeito!");
+      fetchData();
+    } else {
+      toast.error("Erro ao desfazer pagamento", { description: result.error });
     }
   }
 
@@ -119,20 +181,35 @@ export function FinancesList() {
         </Button>
       </div>
 
-      <MonthSelector value={month} onChange={handleMonthChange} />
+      <MonthSelector
+        value={urlMonth}
+        onChange={(m) => setParams({ month: m, page: undefined })}
+      />
 
-      {!loading && <FinancialSummary summary={summary} />}
+      <FinancialFiltersUI
+        status={urlStatus}
+        locationId={urlLocationId}
+        classId={urlClassId}
+        locations={locations}
+        classes={classes}
+        onStatusChange={(v) => setParams({ status: v })}
+        onLocationChange={(v) => setParams({ location: v, class: undefined })}
+        onClassChange={(v) => setParams({ class: v })}
+      />
+
+      {!isPending && <FinancialSummary summary={summary} />}
 
       <FeesTable
         fees={fees}
-        loading={loading}
+        loading={isPending}
         onPayManually={setPayingFee}
+        onUndoPayment={handleUndoPayment}
       />
 
       <FeesPagination
-        page={page}
+        page={urlPage}
         totalPages={totalPages}
-        onPageChange={setPage}
+        onPageChange={(p) => setParams({ page: p > 1 ? String(p) : undefined })}
       />
 
       <PayFeeDialog

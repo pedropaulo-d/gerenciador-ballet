@@ -7,6 +7,7 @@
 export type EnrollmentStatus = 'active' | 'inactive' | 'pending';
 export type ValidityType = 'semester' | 'annual';
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
+export type AttendanceStatus = 'present' | 'absent' | 'justified';
 
 // ---------- Base ----------
 
@@ -74,6 +75,13 @@ export interface MonthlyFee extends Timestamps {
   asaas_payment_id: string | null;
 }
 
+export interface Attendance extends Timestamps {
+  id: string;
+  enrollment_id: string;
+  date: string; // YYYY-MM-DD
+  status: AttendanceStatus;
+}
+
 // ---------- Insert types (omitem campos gerados) ----------
 
 export type LocationInsert = Omit<Location, 'id' | 'created_at' | 'updated_at'> & {
@@ -96,6 +104,10 @@ export type MonthlyFeeInsert = Omit<MonthlyFee, 'id' | 'net_amount' | 'created_a
   id?: string;
 };
 
+export type AttendanceInsert = Omit<Attendance, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string;
+};
+
 // ---------- Update types (todos opcionais) ----------
 
 export type LocationUpdate = Partial<Omit<Location, 'id' | 'created_at' | 'updated_at'>>;
@@ -103,6 +115,7 @@ export type ClassUpdate = Partial<Omit<Class, 'id' | 'created_at' | 'updated_at'
 export type StudentUpdate = Partial<Omit<Student, 'id' | 'created_at' | 'updated_at'>>;
 export type EnrollmentUpdate = Partial<Omit<Enrollment, 'id' | 'created_at' | 'updated_at'>>;
 export type MonthlyFeeUpdate = Partial<Omit<MonthlyFee, 'id' | 'net_amount' | 'created_at' | 'updated_at'>>;
+export type AttendanceUpdate = Partial<Omit<Attendance, 'id' | 'created_at' | 'updated_at'>>;
 
 // ---------- Joins úteis para consultas ----------
 
@@ -125,4 +138,11 @@ export interface EnrollmentWithClass extends Enrollment {
 
 export interface StudentWithEnrollments extends Student {
   enrollments: EnrollmentWithClass[];
+}
+
+/** Used by attendance page: one row per active enrollment with student name + optional attendance record */
+export interface AttendanceRow {
+  enrollmentId: string;
+  studentName: string;
+  status: AttendanceStatus | null;
 }

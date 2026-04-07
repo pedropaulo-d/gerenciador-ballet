@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { FinancesList } from "./finances-list";
 
 export default function FinancesPage() {
-  return <FinancesList />;
+  return (
+    <Suspense>
+      <FinancesList />
+    </Suspense>
+  );
 }

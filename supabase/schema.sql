@@ -96,6 +96,20 @@ create table monthly_fees (
 );
 
 -- ============================================
+-- 6. ATTENDANCE (Chamada / Frequência)
+-- ============================================
+create table attendance (
+  id              uuid primary key default uuid_generate_v4(),
+  enrollment_id   uuid not null references enrollments(id) on delete cascade,
+  date            date not null,
+  status          text not null check (status in ('present', 'absent', 'justified')) default 'present',
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+
+  unique (enrollment_id, date)
+);
+
+-- ============================================
 -- Trigger genérico para atualizar updated_at
 -- ============================================
 create or replace function update_updated_at()
@@ -121,6 +135,9 @@ create trigger trg_enrollments_updated_at
 create trigger trg_monthly_fees_updated_at
   before update on monthly_fees for each row execute function update_updated_at();
 
+create trigger trg_attendance_updated_at
+  before update on attendance for each row execute function update_updated_at();
+
 -- ============================================
 -- Índices úteis para consultas frequentes
 -- ============================================
@@ -131,6 +148,8 @@ create index idx_enrollments_status  on enrollments(status);
 create index idx_monthly_fees_enrollment on monthly_fees(enrollment_id);
 create index idx_monthly_fees_month  on monthly_fees(reference_month);
 create index idx_monthly_fees_status on monthly_fees(status);
+create index idx_attendance_enrollment on attendance(enrollment_id);
+create index idx_attendance_date       on attendance(date);
 
 -- Índices GIN (pg_trgm) para busca textual parcial (ILIKE) na search bar
 create extension if not exists pg_trgm;
@@ -148,6 +167,7 @@ alter table classes      enable row level security;
 alter table students     enable row level security;
 alter table enrollments  enable row level security;
 alter table monthly_fees enable row level security;
+alter table attendance   enable row level security;
 
 -- Políticas permissivas temporárias (substitua por regras reais depois)
 create policy "Allow all for authenticated" on locations    for all to authenticated using (true) with check (true);
@@ -155,6 +175,7 @@ create policy "Allow all for authenticated" on classes      for all to authentic
 create policy "Allow all for authenticated" on students     for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on enrollments  for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on monthly_fees for all to authenticated using (true) with check (true);
+create policy "Allow all for authenticated" on attendance   for all to authenticated using (true) with check (true);
 
 -- Políticas temporárias para anon (até configurar Auth)
 create policy "Allow all for anon" on locations    for all to anon using (true) with check (true);
@@ -162,3 +183,4 @@ create policy "Allow all for anon" on classes      for all to anon using (true) 
 create policy "Allow all for anon" on students     for all to anon using (true) with check (true);
 create policy "Allow all for anon" on enrollments  for all to anon using (true) with check (true);
 create policy "Allow all for anon" on monthly_fees for all to anon using (true) with check (true);
+create policy "Allow all for anon" on attendance   for all to anon using (true) with check (true);
