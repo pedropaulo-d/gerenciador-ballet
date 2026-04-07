@@ -57,7 +57,7 @@ export interface Enrollment extends Timestamps {
   validity_type: ValidityType;
   starts_at: string;
   ends_at: string;
-  monthly_amount: number;
+  base_fee: number;
 }
 
 export interface MonthlyFee extends Timestamps {
@@ -116,4 +116,12 @@ export interface EnrollmentWithDetails extends Enrollment {
 
 export interface MonthlyFeeWithDetails extends MonthlyFee {
   enrollment: EnrollmentWithDetails;
+}
+
+export interface EnrollmentWithClass extends Enrollment {
+  class: ClassWithLocation;
+}
+
+export interface StudentWithEnrollments extends Student {
+  enrollments: EnrollmentWithClass[];
 }

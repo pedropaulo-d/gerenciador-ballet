@@ -9,86 +9,42 @@ import {
   updateLocation,
   deleteLocation,
 } from "@/app/actions/locations";
-import {
-  LocationForm,
-  locationToFormData,
-  formDataToPayload,
-  type LocationFormData,
-} from "@/components/locations/location-form";
+import { formDataToPayload, type LocationFormData } from "@/components/locations/location-form";
+import { LocationsTable } from "@/components/locations/locations-table";
+import { LocationFormDialog } from "@/components/locations/location-form-dialog";
+import { LocationDeleteDialog } from "@/components/locations/location-delete-dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardAction,
-} from "@/components/ui/card";
-import {
-  PlusIcon,
-  PencilIcon,
-  Trash2Icon,
-  MapPinIcon,
-  BanknoteIcon,
-  LoaderIcon,
-} from "lucide-react";
+import { PlusIcon } from "lucide-react";
 
 export function LocationList() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estado dos dialogs
+  // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(null);
 
   const fetchLocations = useCallback(async () => {
     setLoading(true);
     const result = await getLocations();
-    if (result.success) {
-      setLocations(result.data);
-    } else {
-      toast.error("Erro ao carregar locais", { description: result.error });
-    }
+    if (result.success) setLocations(result.data);
+    else toast.error("Erro ao carregar locais", { description: result.error });
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchLocations();
-  }, [fetchLocations]);
+  useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
-  // -- Handlers de abertura dos dialogs --
+  // -- CRUD handlers --
 
   function openCreate() {
     setEditingLocation(null);
     setFormDialogOpen(true);
   }
 
-  function openEdit(location: Location) {
-    setEditingLocation(location);
-    setFormDialogOpen(true);
-  }
-
-  function openDelete(location: Location) {
-    setDeletingLocation(location);
-    setDeleteDialogOpen(true);
-  }
-
-  // -- Handlers de ação --
-
   async function handleFormSubmit(formData: LocationFormData) {
     const payload = formDataToPayload(formData);
-
     const result = editingLocation
       ? await updateLocation(editingLocation.id, payload)
       : await createLocation(payload);
@@ -103,18 +59,12 @@ export function LocationList() {
     fetchLocations();
   }
 
-  async function handleDelete() {
-    if (!deletingLocation) return;
-    setDeleting(true);
-
-    const result = await deleteLocation(deletingLocation.id);
-    setDeleting(false);
-
+  async function handleDelete(id: string) {
+    const result = await deleteLocation(id);
     if (!result.success) {
       toast.error("Erro ao excluir local", { description: result.error });
       return;
     }
-
     toast.success("Local excluído!");
     setDeleteDialogOpen(false);
     setDeletingLocation(null);
@@ -133,124 +83,27 @@ export function LocationList() {
         </Button>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : locations.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-          <MapPinIcon className="size-10 opacity-50" />
-          <p>Nenhum local cadastrado.</p>
-          <Button variant="outline" size="sm" onClick={openCreate}>
-            Cadastrar primeiro local
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {locations.map((location) => (
-            <Card key={location.id} size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {location.name}
-                  {!location.is_active && (
-                    <Badge variant="secondary">Inativo</Badge>
-                  )}
-                </CardTitle>
-                <CardAction>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => openEdit(location)}
-                    >
-                      <PencilIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => openDelete(location)}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </div>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-                {location.address && (
-                  <div className="flex items-center gap-2">
-                    <MapPinIcon className="size-3.5 shrink-0" />
-                    <span>{location.address}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <BanknoteIcon className="size-3.5 shrink-0" />
-                  <span>
-                    Taxa: R$ {Number(location.fee_per_student).toFixed(2)} / aluna
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <LocationsTable
+        locations={locations}
+        loading={loading}
+        onEdit={(loc) => { setEditingLocation(loc); setFormDialogOpen(true); }}
+        onDelete={(loc) => { setDeletingLocation(loc); setDeleteDialogOpen(true); }}
+        onCreateFirst={openCreate}
+      />
 
-      {/* Dialog: Criar / Editar */}
-      <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingLocation ? "Editar Local" : "Novo Local"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingLocation
-                ? "Atualize os dados do local parceiro."
-                : "Preencha os dados do novo local parceiro."}
-            </DialogDescription>
-          </DialogHeader>
+      <LocationFormDialog
+        open={formDialogOpen}
+        onOpenChange={setFormDialogOpen}
+        editingLocation={editingLocation}
+        onSubmit={handleFormSubmit}
+      />
 
-          <LocationForm
-            key={editingLocation?.id ?? "new"}
-            initialData={
-              editingLocation ? locationToFormData(editingLocation) : undefined
-            }
-            isEditing={!!editingLocation}
-            onSubmit={handleFormSubmit}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog: Confirmar exclusão */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Excluir Local</DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir{" "}
-              <strong>{deletingLocation?.name}</strong>? Todas as turmas
-              vinculadas também serão removidas.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <LoaderIcon className="size-4 animate-spin" />
-              ) : (
-                "Excluir"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LocationDeleteDialog
+        location={deletingLocation}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

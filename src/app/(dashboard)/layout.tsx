@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MapPinIcon, UsersIcon, GraduationCapIcon, DollarSignIcon } from "lucide-react";
+import { MapPinIcon, UsersIcon, GraduationCapIcon, DollarSignIcon, UploadIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/students", label: "Alunas", icon: UsersIcon },
   { href: "/classes", label: "Turmas", icon: GraduationCapIcon },
   { href: "/finances", label: "Financeiro", icon: DollarSignIcon },
+  { href: "/import", label: "Importar", icon: UploadIcon },
 ];
 
 export default function DashboardLayout({

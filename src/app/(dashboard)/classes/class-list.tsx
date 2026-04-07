@@ -10,26 +10,21 @@ import {
   updateClass,
   deleteClass,
 } from "@/app/actions/classes";
-import {
-  ClassForm,
-  classToFormData,
-  formDataToPayload,
-  type ClassFormData,
-} from "@/components/classes/class-form";
-import {
-  ClassesTable,
-  ALL_LOCATIONS,
-} from "@/components/classes/classes-table";
+import { formDataToPayload, type ClassFormData } from "@/components/classes/class-form";
+import { ClassesTable } from "@/components/classes/classes-table";
+import { ClassFormDialog } from "@/components/classes/class-form-dialog";
+import { ClassDeleteDialog } from "@/components/classes/class-delete-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { PlusIcon, LoaderIcon } from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PlusIcon, MapPinIcon } from "lucide-react";
+
+const ALL_LOCATIONS = "__all__";
 
 export function ClassList() {
   const [classes, setClasses] = useState<ClassWithLocation[]>([]);
@@ -37,11 +32,13 @@ export function ClassList() {
   const [loading, setLoading] = useState(true);
   const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS);
 
+  // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassWithLocation | null>(null);
   const [deletingClass, setDeletingClass] = useState<ClassWithLocation | null>(null);
+
+  // -- Data fetching --
 
   const fetchLocations = useCallback(async () => {
     const result = await getLocations();
@@ -59,15 +56,10 @@ export function ClassList() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchLocations();
-  }, [fetchLocations]);
+  useEffect(() => { fetchLocations(); }, [fetchLocations]);
+  useEffect(() => { fetchClasses(selectedLocationId); }, [fetchClasses, selectedLocationId]);
 
-  useEffect(() => {
-    fetchClasses(selectedLocationId);
-  }, [fetchClasses, selectedLocationId]);
-
-  // -- Handlers de abertura dos dialogs --
+  // -- CRUD handlers --
 
   function openCreate() {
     if (locations.length === 0) {
@@ -78,21 +70,8 @@ export function ClassList() {
     setFormDialogOpen(true);
   }
 
-  function openEdit(cls: ClassWithLocation) {
-    setEditingClass(cls);
-    setFormDialogOpen(true);
-  }
-
-  function openDelete(cls: ClassWithLocation) {
-    setDeletingClass(cls);
-    setDeleteDialogOpen(true);
-  }
-
-  // -- Handlers de ação --
-
   async function handleFormSubmit(formData: ClassFormData) {
     const payload = formDataToPayload(formData);
-
     const result = editingClass
       ? await updateClass(editingClass.id, payload)
       : await createClass(payload);
@@ -107,18 +86,12 @@ export function ClassList() {
     fetchClasses(selectedLocationId);
   }
 
-  async function handleDelete() {
-    if (!deletingClass) return;
-    setDeleting(true);
-
-    const result = await deleteClass(deletingClass.id);
-    setDeleting(false);
-
+  async function handleDelete(id: string) {
+    const result = await deleteClass(id);
     if (!result.success) {
       toast.error("Erro ao excluir turma", { description: result.error });
       return;
     }
-
     toast.success("Turma excluída!");
     setDeleteDialogOpen(false);
     setDeletingClass(null);
@@ -137,75 +110,46 @@ export function ClassList() {
         </Button>
       </div>
 
+      {locations.length > 0 && (
+        <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+          <SelectTrigger className="w-full">
+            <MapPinIcon className="size-3.5 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_LOCATIONS}>Todos os Locais</SelectItem>
+            {locations.map((loc) => (
+              <SelectItem key={loc.id} value={loc.id}>
+                {loc.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
       <ClassesTable
         classes={classes}
-        locations={locations}
         loading={loading}
-        selectedLocationId={selectedLocationId}
-        onLocationChange={setSelectedLocationId}
-        onEdit={openEdit}
-        onDelete={openDelete}
+        hasLocationFilter={selectedLocationId !== ALL_LOCATIONS}
+        onEdit={(cls) => { setEditingClass(cls); setFormDialogOpen(true); }}
+        onDelete={(cls) => { setDeletingClass(cls); setDeleteDialogOpen(true); }}
         onCreateFirst={openCreate}
       />
 
-      {/* Dialog: Criar / Editar */}
-      <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingClass ? "Editar Turma" : "Nova Turma"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingClass
-                ? "Atualize os dados da turma."
-                : "Preencha os dados da nova turma."}
-            </DialogDescription>
-          </DialogHeader>
+      <ClassFormDialog
+        open={formDialogOpen}
+        onOpenChange={setFormDialogOpen}
+        editingClass={editingClass}
+        locations={locations}
+        onSubmit={handleFormSubmit}
+      />
 
-          <ClassForm
-            key={editingClass?.id ?? "new"}
-            locations={locations}
-            initialData={
-              editingClass ? classToFormData(editingClass) : undefined
-            }
-            isEditing={!!editingClass}
-            onSubmit={handleFormSubmit}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog: Confirmar exclusão */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Excluir Turma</DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir{" "}
-              <strong>{deletingClass?.name}</strong>? Todas as matrículas
-              vinculadas também serão removidas.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <LoaderIcon className="size-4 animate-spin" />
-              ) : (
-                "Excluir"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ClassDeleteDialog
+        classItem={deletingClass}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

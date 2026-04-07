@@ -66,7 +66,7 @@ create table enrollments (
   validity_type   text not null check (validity_type in ('semester', 'annual')) default 'semester',
   starts_at       date not null,
   ends_at         date not null,
-  monthly_amount  numeric(10,2) not null, -- valor bruto da mensalidade
+  base_fee        numeric(10,2) not null, -- valor base bruto da mensalidade (Asaas cuida de descontos/juros)
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
 
@@ -131,6 +131,14 @@ create index idx_monthly_fees_enrollment on monthly_fees(enrollment_id);
 create index idx_monthly_fees_month  on monthly_fees(reference_month);
 create index idx_monthly_fees_status on monthly_fees(status);
 
+-- Índices GIN (pg_trgm) para busca textual parcial (ILIKE) na search bar
+create extension if not exists pg_trgm;
+
+create index idx_students_full_name_trgm     on students using gin (full_name     gin_trgm_ops);
+create index idx_students_guardian_name_trgm  on students using gin (guardian_name  gin_trgm_ops);
+create index idx_students_guardian_phone_trgm on students using gin (guardian_phone gin_trgm_ops);
+create index idx_students_guardian_cpf_trgm   on students using gin (guardian_cpf   gin_trgm_ops);
+
 -- ============================================
 -- Row Level Security (placeholder — habilitar após configurar auth)
 -- ============================================
@@ -146,3 +154,10 @@ create policy "Allow all for authenticated" on classes      for all to authentic
 create policy "Allow all for authenticated" on students     for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on enrollments  for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on monthly_fees for all to authenticated using (true) with check (true);
+
+-- Políticas temporárias para anon (até configurar Auth)
+create policy "Allow all for anon" on locations    for all to anon using (true) with check (true);
+create policy "Allow all for anon" on classes      for all to anon using (true) with check (true);
+create policy "Allow all for anon" on students     for all to anon using (true) with check (true);
+create policy "Allow all for anon" on enrollments  for all to anon using (true) with check (true);
+create policy "Allow all for anon" on monthly_fees for all to anon using (true) with check (true);
