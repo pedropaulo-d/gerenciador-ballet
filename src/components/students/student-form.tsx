@@ -28,6 +28,7 @@ export type StudentFormData = {
   class_id: string;
   validity_type: "semester" | "annual";
   base_fee: string;
+  due_day: "5" | "7";
 };
 
 const emptyForm: StudentFormData = {
@@ -42,6 +43,7 @@ const emptyForm: StudentFormData = {
   class_id: "",
   validity_type: "semester",
   base_fee: "",
+  due_day: "5",
 };
 
 export function studentToFormData(student: Student): StudentFormData {
@@ -58,6 +60,7 @@ export function studentToFormData(student: Student): StudentFormData {
     class_id: "",
     validity_type: "semester",
     base_fee: "",
+    due_day: "5",
   };
 }
 
@@ -91,6 +94,7 @@ export function formDataToEnrollmentPayload(form: StudentFormData) {
     starts_at: startsAt,
     ends_at: endsAt,
     base_fee: parseFloat(form.base_fee) || 0,
+    due_day: parseInt(form.due_day),
   };
 }
 
@@ -259,7 +263,7 @@ export function StudentForm({
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="base-fee">Valor Base da Mensalidade (R$) *</Label>
+              <Label htmlFor="base-fee">Valor Base (R$) *</Label>
               <Input
                 id="base-fee"
                 type="number"
@@ -273,6 +277,24 @@ export function StudentForm({
                 required
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Dia de vencimento *</Label>
+            <Select
+              value={form.due_day}
+              onValueChange={(v) =>
+                setForm({ ...form, due_day: v as "5" | "7" })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">Dia 05</SelectItem>
+                <SelectItem value="7">Dia 07</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </>
       )}

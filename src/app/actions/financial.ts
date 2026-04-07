@@ -1,0 +1,233 @@
+"use server";
+
+import { supabase } from "@/lib/supabase";
+import type { ActionResult } from "@/lib/action-result";
+import type { MonthlyFeeWithDetails } from "@/types/database";
+
+// ---------- Types ----------
+
+export type FinancialSummary = {
+  totalNetReceived: number;
+  totalPending: number;
+  totalOverdue: number;
+  feesCount: number;
+  paidCount: number;
+};
+
+export type FinancialPageData = {
+  fees: MonthlyFeeWithDetails[];
+  total: number;
+  summary: FinancialSummary;
+};
+
+// ---------- Actions ----------
+
+/**
+ * Fetch monthly fees for a given month with pagination and full enrollment details.
+ * Also auto-marks pending fees as overdue based on enrollment.due_day.
+ */
+export async function getFinancialByMonth(
+  referenceMonth: string,
+  page = 1,
+  pageSize = 15
+): Promise<ActionResult<FinancialPageData>> {
+  try {
+    // Auto-mark overdue fees before fetching
+    await markOverdueFees(referenceMonth);
+
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await supabase
+      .from("monthly_fees")
+      .select(
+        "*, enrollment:enrollments(*, student:students(*), class:classes(*, location:locations(*)))",
+        { count: "exact" }
+      )
+      .eq("reference_month", referenceMonth)
+      .order("created_at")
+      .range(from, to);
+
+    if (error) return { success: false, error: error.message };
+
+    const fees = data as MonthlyFeeWithDetails[];
+
+    // Summary uses a separate query for totals (all fees, not just current page)
+    const summary = await computeSummary(referenceMonth);
+
+    return {
+      success: true,
+      data: { fees, total: count ?? 0, summary },
+    };
+  } catch {
+    return { success: false, error: "Falha ao buscar dados financeiros." };
+  }
+}
+
+/**
+ * Auto-mark pending fees as overdue when current date > due_day of reference month.
+ */
+async function markOverdueFees(referenceMonth: string): Promise<void> {
+  const now = new Date();
+  const [year, month] = referenceMonth.split("-").map(Number);
+
+  // Only mark overdue if we're in or past the reference month
+  const refDate = new Date(year, month - 1, 1);
+  if (now < refDate) return;
+
+  // Get pending fees for this month with their enrollment's due_day
+  const { data: pendingFees } = await supabase
+    .from("monthly_fees")
+    .select("id, enrollment:enrollments(due_day)")
+    .eq("reference_month", referenceMonth)
+    .eq("status", "pending");
+
+  if (!pendingFees || pendingFees.length === 0) return;
+
+  const overdueIds: string[] = [];
+  for (const fee of pendingFees as any[]) {
+    const dueDay = fee.enrollment?.due_day ?? 5;
+    const dueDate = new Date(year, month - 1, dueDay, 23, 59, 59);
+    if (now > dueDate) {
+      overdueIds.push(fee.id);
+    }
+  }
+
+  if (overdueIds.length > 0) {
+    await supabase
+      .from("monthly_fees")
+      .update({ status: "overdue" })
+      .in("id", overdueIds);
+  }
+}
+
+/**
+ * Compute summary for all fees in a month (not paginated).
+ */
+async function computeSummary(referenceMonth: string): Promise<FinancialSummary> {
+  const { data } = await supabase
+    .from("monthly_fees")
+    .select("status, gross_amount, net_amount")
+    .eq("reference_month", referenceMonth);
+
+  const summary: FinancialSummary = {
+    totalNetReceived: 0,
+    totalPending: 0,
+    totalOverdue: 0,
+    feesCount: 0,
+    paidCount: 0,
+  };
+
+  if (!data) return summary;
+
+  summary.feesCount = data.length;
+
+  for (const fee of data) {
+    if (fee.status === "paid") {
+      summary.totalNetReceived += Number(fee.net_amount);
+      summary.paidCount++;
+    } else if (fee.status === "overdue") {
+      summary.totalOverdue += Number(fee.gross_amount);
+    } else if (fee.status === "pending") {
+      summary.totalPending += Number(fee.gross_amount);
+    }
+  }
+
+  return summary;
+}
+
+/**
+ * Generate monthly fee records for all active enrollments for a given month.
+ * Skips enrollments that already have a fee for that month.
+ */
+export async function generateFeesForMonth(
+  referenceMonth: string
+): Promise<ActionResult<{ created: number; skipped: number }>> {
+  try {
+    // Fetch active enrollments with location fee data
+    const { data: enrollments, error: enrollError } = await supabase
+      .from("enrollments")
+      .select("id, base_fee, class:classes(location:locations(fee_per_student))")
+      .eq("status", "active");
+
+    if (enrollError) return { success: false, error: enrollError.message };
+    if (!enrollments || enrollments.length === 0) {
+      return { success: true, data: { created: 0, skipped: 0 } };
+    }
+
+    // Check which already have fees for this month
+    const { data: existing } = await supabase
+      .from("monthly_fees")
+      .select("enrollment_id")
+      .eq("reference_month", referenceMonth);
+
+    const existingIds = new Set(
+      (existing ?? []).map((e) => e.enrollment_id)
+    );
+
+    const toInsert: Array<{
+      enrollment_id: string;
+      reference_month: string;
+      gross_amount: number;
+      location_fee: number;
+      asaas_fee: number;
+      status: string;
+    }> = [];
+
+    for (const enrollment of enrollments as any[]) {
+      if (existingIds.has(enrollment.id)) continue;
+
+      const locationFee =
+        enrollment.class?.location?.fee_per_student ?? 0;
+
+      toInsert.push({
+        enrollment_id: enrollment.id,
+        reference_month: referenceMonth,
+        gross_amount: Number(enrollment.base_fee),
+        location_fee: Number(locationFee),
+        asaas_fee: 0,
+        status: "pending",
+      });
+    }
+
+    if (toInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from("monthly_fees")
+        .insert(toInsert);
+
+      if (insertError) return { success: false, error: insertError.message };
+    }
+
+    return {
+      success: true,
+      data: {
+        created: toInsert.length,
+        skipped: enrollments.length - toInsert.length,
+      },
+    };
+  } catch {
+    return { success: false, error: "Falha ao gerar mensalidades." };
+  }
+}
+
+/**
+ * Manual payment: mark a fee as paid with current timestamp.
+ */
+export async function payFeeManually(
+  feeId: string
+): Promise<ActionResult> {
+  try {
+    const { error } = await supabase
+      .from("monthly_fees")
+      .update({
+        status: "paid",
+        paid_at: new Date().toISOString(),
+      })
+      .eq("id", feeId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: null };
+  } catch {
+    return { success: false, error: "Falha ao registrar pagamento." };
+  }
+}

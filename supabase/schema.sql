@@ -67,6 +67,7 @@ create table enrollments (
   starts_at       date not null,
   ends_at         date not null,
   base_fee        numeric(10,2) not null, -- valor base bruto da mensalidade (Asaas cuida de descontos/juros)
+  due_day         smallint not null default 5 check (due_day in (5, 7)), -- dia de vencimento: 5 ou 7
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
 

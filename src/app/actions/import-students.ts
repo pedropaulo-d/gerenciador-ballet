@@ -260,6 +260,7 @@ export async function importStudentsFromCsv(
           starts_at: startsAt,
           ends_at: endsAt,
           base_fee: parseCurrency(row["MENSALIDADE"] || ""),
+          due_day: 5,
         });
 
       if (enrollmentError) {

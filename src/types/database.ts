@@ -58,6 +58,7 @@ export interface Enrollment extends Timestamps {
   starts_at: string;
   ends_at: string;
   base_fee: number;
+  due_day: number; // 5 ou 7
 }
 
 export interface MonthlyFee extends Timestamps {
