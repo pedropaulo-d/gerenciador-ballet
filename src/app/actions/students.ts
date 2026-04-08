@@ -1,7 +1,9 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
+
+const supabase = getServiceSupabase();
 import type {
   Student,
   StudentInsert,
@@ -112,24 +114,6 @@ export async function getStudentsPaginated(
         total: count ?? 0,
       },
     };
-  } catch {
-    return { success: false, error: "Falha ao buscar alunas." };
-  }
-}
-
-// ---------- Legacy full list (kept for other consumers) ----------
-
-export async function getStudentsWithEnrollments(): Promise<
-  ActionResult<StudentWithEnrollments[]>
-> {
-  try {
-    const { data, error } = await supabase
-      .from("students")
-      .select("*, enrollments(*, class:classes(*, location:locations(*)))")
-      .order("full_name");
-
-    if (error) return { success: false, error: error.message };
-    return { success: true, data: data as StudentWithEnrollments[] };
   } catch {
     return { success: false, error: "Falha ao buscar alunas." };
   }

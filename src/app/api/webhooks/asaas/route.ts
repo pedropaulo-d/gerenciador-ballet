@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
+
+const supabase = getServiceSupabase();
 
 /**
  * Asaas Webhook handler.
@@ -7,12 +9,10 @@ import { supabase } from "@/lib/supabase";
  * Configure this URL in the Asaas dashboard:
  *   POST https://<your-domain>/api/webhooks/asaas
  *
- * Asaas sends events like PAYMENT_RECEIVED, PAYMENT_OVERDUE, etc.
- * Docs: https://docs.asaas.com/docs/webhooks
+ * Required env var: ASAAS_WEBHOOK_TOKEN
  */
 
-// TODO: Store in .env as ASAAS_WEBHOOK_TOKEN and validate on every request
-// const ASAAS_WEBHOOK_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN;
+const ASAAS_WEBHOOK_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN;
 
 type AsaasEvent =
   | "PAYMENT_RECEIVED"
@@ -21,26 +21,39 @@ type AsaasEvent =
   | "PAYMENT_DELETED"
   | "PAYMENT_REFUNDED";
 
+const VALID_EVENTS = new Set<string>([
+  "PAYMENT_RECEIVED",
+  "PAYMENT_CONFIRMED",
+  "PAYMENT_OVERDUE",
+  "PAYMENT_DELETED",
+  "PAYMENT_REFUNDED",
+]);
+
 type AsaasWebhookPayload = {
   event: AsaasEvent;
   payment: {
-    id: string;              // Asaas payment ID (e.g. "pay_abc123")
-    value: number;           // Gross amount charged
-    netValue: number;        // Amount after Asaas fees
-    status: string;          // Asaas status
+    id: string;
+    value: number;
+    netValue: number;
+    status: string;
     confirmedDate: string | null;
-    externalReference: string | null; // Our monthly_fee.id or enrollment reference
+    externalReference: string | null;
   };
 };
 
 export async function POST(request: NextRequest) {
   // --- 1. Validate webhook token ---
-  // TODO: Uncomment after configuring ASAAS_WEBHOOK_TOKEN in .env
-  // const token = request.headers.get("asaas-access-token");
-  // if (token !== ASAAS_WEBHOOK_TOKEN) {
-  //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  // }
+  if (!ASAAS_WEBHOOK_TOKEN) {
+    console.error("[Asaas Webhook] ASAAS_WEBHOOK_TOKEN not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  }
 
+  const token = request.headers.get("asaas-access-token");
+  if (token !== ASAAS_WEBHOOK_TOKEN) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // --- 2. Parse and validate payload ---
   let body: AsaasWebhookPayload;
   try {
     body = await request.json();
@@ -50,13 +63,20 @@ export async function POST(request: NextRequest) {
 
   const { event, payment } = body;
 
-  if (!event || !payment?.id) {
-    return NextResponse.json({ error: "Missing event or payment" }, { status: 400 });
+  if (!event || !VALID_EVENTS.has(event)) {
+    return NextResponse.json({ error: "Invalid or unsupported event" }, { status: 400 });
   }
 
-  // --- 2. Find the monthly_fee by asaas_payment_id ---
-  // The asaas_payment_id should be set when creating the charge in Asaas,
-  // or use externalReference to match our records.
+  if (
+    !payment?.id ||
+    typeof payment.id !== "string" ||
+    typeof payment.value !== "number" ||
+    typeof payment.netValue !== "number"
+  ) {
+    return NextResponse.json({ error: "Invalid payment payload" }, { status: 400 });
+  }
+
+  // --- 3. Find the monthly_fee by asaas_payment_id ---
   const { data: fee, error: findError } = await supabase
     .from("monthly_fees")
     .select("id, gross_amount, location_fee")
@@ -69,17 +89,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (!fee) {
-    // Not found — could be a payment we don't track, or asaas_payment_id not yet linked.
-    // Return 200 so Asaas doesn't retry indefinitely.
     console.warn("[Asaas Webhook] No fee found for payment:", payment.id);
     return NextResponse.json({ status: "ignored", reason: "fee_not_found" });
   }
 
-  // --- 3. Handle events ---
+  // --- 4. Handle events ---
   switch (event) {
     case "PAYMENT_RECEIVED":
     case "PAYMENT_CONFIRMED": {
-      // Calculate Asaas fee: gross charged minus net received from Asaas
       const asaasFee = Math.max(0, payment.value - payment.netValue);
 
       const { error: updateError } = await supabase
@@ -114,10 +131,6 @@ export async function POST(request: NextRequest) {
         .eq("id", fee.id);
       break;
     }
-
-    default:
-      // Unknown event — acknowledge but do nothing
-      break;
   }
 
   return NextResponse.json({ status: "ok" });

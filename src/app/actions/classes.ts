@@ -1,7 +1,9 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
+
+const supabase = getServiceSupabase();
 import type {
   Class,
   ClassInsert,

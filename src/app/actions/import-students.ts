@@ -1,6 +1,8 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
+
+const supabase = getServiceSupabase();
 
 export type ImportRowResult = {
   row: number;
@@ -164,10 +166,11 @@ export async function importStudentsFromCsv(
   }
 
   // Build lookup entries
-  const lookupEntries: ClassLookupEntry[] = classes.map((cls: any) => ({
+  const typedClasses = classes as { id: string; name: string; location: { name: string }[] }[];
+  const lookupEntries: ClassLookupEntry[] = typedClasses.map((cls) => ({
     classId: cls.id,
     className: cls.name,
-    locationName: cls.location?.name ?? "",
+    locationName: cls.location?.[0]?.name ?? "",
   }));
 
   for (let i = 0; i < rows.length; i++) {

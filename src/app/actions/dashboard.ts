@@ -1,7 +1,10 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
+import { nowBrasilia } from "@/lib/formatters";
+
+const supabase = getServiceSupabase();
 
 export type BirthdayStudent = {
   id: string;
@@ -12,6 +15,7 @@ export type BirthdayStudent = {
 type BirthdayRow = {
   id: string;
   full_name: string;
+  birth_date: string;
   enrollments: {
     class: { name: string } | null;
   }[];
@@ -21,7 +25,7 @@ export async function getTodayBirthdays(): Promise<
   ActionResult<BirthdayStudent[]>
 > {
   try {
-    const now = new Date();
+    const now = nowBrasilia();
     const day = now.getDate();
     const month = now.getMonth() + 1;
 
@@ -31,14 +35,10 @@ export async function getTodayBirthdays(): Promise<
     const { data, error } = await supabase
       .from("students")
       .select(
-        "id, full_name, enrollments(class:classes(name))"
+        "id, full_name, birth_date, enrollments(class:classes(name))"
       )
       .eq("is_active", true)
-      .filter(
-        "birth_date",
-        "not.is",
-        null
-      );
+      .not("birth_date", "is", null);
 
     if (error) return { success: false, error: error.message };
 
@@ -46,12 +46,7 @@ export async function getTodayBirthdays(): Promise<
 
     const birthdays = rows
       .filter((s) => {
-        if (!s.full_name) return false;
-        // birth_date comes as "YYYY-MM-DD" string from the select
-        // We need to check it from the raw data
-        const raw = s as unknown as { birth_date: string | null };
-        if (!raw.birth_date) return false;
-        const [, m, d] = raw.birth_date.split("-").map(Number);
+        const [, m, d] = s.birth_date.split("-").map(Number);
         return d === day && m === month;
       })
       .map((s) => {

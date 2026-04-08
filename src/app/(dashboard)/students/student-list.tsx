@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type {
   Location,
@@ -23,10 +22,11 @@ import {
 } from "@/components/students/student-form";
 import { StudentFilters } from "@/components/students/student-filters";
 import { StudentsTable } from "@/components/students/students-table";
-import { StudentPagination } from "@/components/students/student-pagination";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { StudentFormDialog } from "@/components/students/student-form-dialog";
 import { StudentDeleteDialog } from "@/components/students/student-delete-dialog";
 import { StudentProfileSheet } from "@/components/students/student-profile-sheet";
+import { useUrlParams } from "@/lib/use-url-params";
 import { Button } from "@/components/ui/button";
 import { PlusIcon, UploadIcon } from "lucide-react";
 import Link from "next/link";
@@ -35,10 +35,7 @@ const PAGE_SIZE = 10;
 const ALL = "__all__";
 
 export function StudentList() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  // URL state
+  const { searchParams, setParams } = useUrlParams("/students", ALL);
   const urlSearch = searchParams.get("q") ?? "";
   const urlLocationId = searchParams.get("location") ?? ALL;
   const urlClassId = searchParams.get("class") ?? ALL;
@@ -60,22 +57,6 @@ export function StudentList() {
   const [deletingStudent, setDeletingStudent] =
     useState<StudentWithEnrollments | null>(null);
   const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
-
-  // -- URL helpers --
-
-  const setParams = useCallback(
-    (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, value] of Object.entries(updates)) {
-        if (!value || value === ALL) params.delete(key);
-        else params.set(key, value);
-      }
-      if (!("page" in updates)) params.delete("page");
-      const qs = params.toString();
-      router.replace(qs ? `?${qs}` : "/students", { scroll: false });
-    },
-    [router, searchParams]
-  );
 
   // -- Data fetching --
 
@@ -202,7 +183,7 @@ export function StudentList() {
         onCreateFirst={openCreate}
       />
 
-      <StudentPagination
+      <PaginationControls
         page={urlPage}
         totalPages={totalPages}
         onPageChange={(p) => setParams({ page: p > 1 ? String(p) : undefined })}

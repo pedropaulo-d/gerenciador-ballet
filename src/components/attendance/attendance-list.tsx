@@ -42,6 +42,7 @@ interface AttendanceListProps {
   onSave: () => void;
   saving: boolean;
   hasClass: boolean;
+  hasChanges: boolean;
 }
 
 export function AttendanceList({
@@ -53,6 +54,7 @@ export function AttendanceList({
   onSave,
   saving,
   hasClass,
+  hasChanges,
 }: AttendanceListProps) {
   if (!hasClass) {
     return (
@@ -129,7 +131,7 @@ export function AttendanceList({
       <Button
         className="mt-2 w-full"
         size="lg"
-        disabled={saving || filledCount === 0}
+        disabled={saving || !hasChanges}
         onClick={onSave}
       >
         {saving ? (

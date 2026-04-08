@@ -172,7 +172,7 @@ alter table enrollments  enable row level security;
 alter table monthly_fees enable row level security;
 alter table attendance   enable row level security;
 
--- Políticas permissivas temporárias (substitua por regras reais depois)
+-- Políticas de acesso: apenas usuários autenticados (single-tenant)
 create policy "Allow all for authenticated" on locations    for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on classes      for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on students     for all to authenticated using (true) with check (true);
@@ -180,10 +180,5 @@ create policy "Allow all for authenticated" on enrollments  for all to authentic
 create policy "Allow all for authenticated" on monthly_fees for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on attendance   for all to authenticated using (true) with check (true);
 
--- Políticas temporárias para anon (até configurar Auth)
-create policy "Allow all for anon" on locations    for all to anon using (true) with check (true);
-create policy "Allow all for anon" on classes      for all to anon using (true) with check (true);
-create policy "Allow all for anon" on students     for all to anon using (true) with check (true);
-create policy "Allow all for anon" on enrollments  for all to anon using (true) with check (true);
-create policy "Allow all for anon" on monthly_fees for all to anon using (true) with check (true);
-create policy "Allow all for anon" on attendance   for all to anon using (true) with check (true);
+-- IMPORTANTE: Nenhuma policy para 'anon'. A anon key (pública) não tem acesso.
+-- O webhook Asaas deve usar SUPABASE_SERVICE_ROLE_KEY, que bypassa RLS.

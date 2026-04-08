@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type { MonthlyFeeWithDetails, Location, ClassWithLocation } from "@/types/database";
 import {
@@ -18,18 +17,15 @@ import { MonthSelector } from "@/components/financial/month-selector";
 import { FinancialSummary } from "@/components/financial/financial-summary";
 import { FinancialFilters as FinancialFiltersUI } from "@/components/financial/financial-filters";
 import { FeesTable } from "@/components/financial/fees-table";
-import { FeesPagination } from "@/components/financial/fees-pagination";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { PayFeeDialog } from "@/components/financial/pay-fee-dialog";
+import { useUrlParams } from "@/lib/use-url-params";
 import { Button } from "@/components/ui/button";
+import { getCurrentMonth } from "@/lib/formatters";
 import { LoaderIcon, PlusCircleIcon } from "lucide-react";
 
 const PAGE_SIZE = 15;
 const ALL = "__all__";
-
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-}
 
 const emptySummary: SummaryData = {
   totalNetReceived: 0,
@@ -40,8 +36,7 @@ const emptySummary: SummaryData = {
 };
 
 export function FinancesList() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const { searchParams, setParams } = useUrlParams("/finances", ALL);
   const [isPending, startTransition] = useTransition();
 
   // URL state
@@ -69,23 +64,7 @@ export function FinancesList() {
     classId: urlClassId !== ALL ? urlClassId : undefined,
   }), [urlStatus, urlLocationId, urlClassId]);
 
-  // -- URL helpers --
-
-  const setParams = useCallback(
-    (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, value] of Object.entries(updates)) {
-        if (!value || value === ALL) params.delete(key);
-        else params.set(key, value);
-      }
-      if (!("page" in updates)) params.delete("page");
-      const qs = params.toString();
-      router.replace(qs ? `?${qs}` : "/finances", { scroll: false });
-    },
-    [router, searchParams]
-  );
-
-  // -- Data fetching via startTransition (no sync setState in effects) --
+  // -- Data fetching --
 
   const fetchData = useCallback(() => {
     startTransition(async () => {
@@ -206,7 +185,7 @@ export function FinancesList() {
         onUndoPayment={handleUndoPayment}
       />
 
-      <FeesPagination
+      <PaginationControls
         page={urlPage}
         totalPages={totalPages}
         onPageChange={(p) => setParams({ page: p > 1 ? String(p) : undefined })}

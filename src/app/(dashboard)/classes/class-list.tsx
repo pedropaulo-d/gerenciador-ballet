@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import type { Location, ClassWithLocation } from "@/types/database";
 import { getLocations } from "@/app/actions/locations";
@@ -29,7 +29,7 @@ const ALL_LOCATIONS = "__all__";
 export function ClassList() {
   const [classes, setClasses] = useState<ClassWithLocation[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
   const [selectedLocationId, setSelectedLocationId] = useState(ALL_LOCATIONS);
 
   // Dialog state
@@ -40,21 +40,23 @@ export function ClassList() {
 
   // -- Data fetching --
 
-  const fetchLocations = useCallback(async () => {
-    const result = await getLocations();
-    if (result.success) setLocations(result.data);
-    else toast.error("Erro ao carregar locais", { description: result.error });
-  }, []);
+  const fetchLocations = useCallback(() => {
+    startTransition(async () => {
+      const result = await getLocations();
+      if (result.success) setLocations(result.data);
+      else toast.error("Erro ao carregar locais", { description: result.error });
+    });
+  }, [startTransition]);
 
-  const fetchClasses = useCallback(async (locationId?: string) => {
-    setLoading(true);
-    const result = await getClassesWithLocation(
-      locationId === ALL_LOCATIONS ? undefined : locationId
-    );
-    if (result.success) setClasses(result.data);
-    else toast.error("Erro ao carregar turmas", { description: result.error });
-    setLoading(false);
-  }, []);
+  const fetchClasses = useCallback((locationId?: string) => {
+    startTransition(async () => {
+      const result = await getClassesWithLocation(
+        locationId === ALL_LOCATIONS ? undefined : locationId
+      );
+      if (result.success) setClasses(result.data);
+      else toast.error("Erro ao carregar turmas", { description: result.error });
+    });
+  }, [startTransition]);
 
   useEffect(() => { fetchLocations(); }, [fetchLocations]);
   useEffect(() => { fetchClasses(selectedLocationId); }, [fetchClasses, selectedLocationId]);
@@ -129,7 +131,7 @@ export function ClassList() {
 
       <ClassesTable
         classes={classes}
-        loading={loading}
+        loading={isPending}
         hasLocationFilter={selectedLocationId !== ALL_LOCATIONS}
         onEdit={(cls) => { setEditingClass(cls); setFormDialogOpen(true); }}
         onDelete={(cls) => { setDeletingClass(cls); setDeleteDialogOpen(true); }}

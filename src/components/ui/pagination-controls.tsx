@@ -3,17 +3,17 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
-interface StudentPaginationProps {
+interface PaginationControlsProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
 }
 
-export function StudentPagination({
+export function PaginationControls({
   page,
   totalPages,
   onPageChange,
-}: StudentPaginationProps) {
+}: PaginationControlsProps) {
   if (totalPages <= 1) return null;
 
   return (

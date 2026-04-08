@@ -1,8 +1,11 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
+
+const supabase = getServiceSupabase();
 import type { AttendanceStatus } from "@/types/database";
+import { getCurrentMonth, getCurrentMonthRange } from "@/lib/formatters";
 
 // ---------- Return type ----------
 
@@ -45,23 +48,6 @@ type FeeStatusRow = {
 type AttendanceCountRow = {
   status: AttendanceStatus;
 };
-
-// ---------- Helpers ----------
-
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-}
-
-function getCurrentMonthRange(): { start: string; end: string } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const start = `${y}-${String(m + 1).padStart(2, "0")}-01`;
-  const lastDay = new Date(y, m + 1, 0).getDate();
-  const end = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  return { start, end };
-}
 
 // ---------- Action ----------
 

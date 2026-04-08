@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import type { Location } from "@/types/database";
 import {
@@ -18,7 +18,7 @@ import { PlusIcon } from "lucide-react";
 
 export function LocationList() {
   const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
 
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -26,13 +26,13 @@ export function LocationList() {
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(null);
 
-  const fetchLocations = useCallback(async () => {
-    setLoading(true);
-    const result = await getLocations();
-    if (result.success) setLocations(result.data);
-    else toast.error("Erro ao carregar locais", { description: result.error });
-    setLoading(false);
-  }, []);
+  const fetchLocations = useCallback(() => {
+    startTransition(async () => {
+      const result = await getLocations();
+      if (result.success) setLocations(result.data);
+      else toast.error("Erro ao carregar locais", { description: result.error });
+    });
+  }, [startTransition]);
 
   useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
@@ -85,7 +85,7 @@ export function LocationList() {
 
       <LocationsTable
         locations={locations}
-        loading={loading}
+        loading={isPending}
         onEdit={(loc) => { setEditingLocation(loc); setFormDialogOpen(true); }}
         onDelete={(loc) => { setDeletingLocation(loc); setDeleteDialogOpen(true); }}
         onCreateFirst={openCreate}

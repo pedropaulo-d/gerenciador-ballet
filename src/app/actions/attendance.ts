@@ -1,7 +1,9 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
+
+const supabase = getServiceSupabase();
 import type { AttendanceRow, AttendanceStatus } from "@/types/database";
 
 // ---------- Query row shapes ----------
@@ -83,30 +85,46 @@ export async function getAttendanceByClassAndDate(
 }
 
 /**
- * Save attendance records for a class on a given date (upsert).
- * Only saves entries where the user has selected a status.
+ * Save attendance records for a class on a given date.
+ * Upserts entries with a status and deletes entries that were cleared.
  */
 export async function saveAttendance(
   date: string,
-  records: { enrollmentId: string; status: AttendanceStatus; justification?: string | null }[]
+  records: { enrollmentId: string; status: AttendanceStatus; justification?: string | null }[],
+  removals: string[] = []
 ): Promise<ActionResult> {
   try {
-    if (records.length === 0) {
+    if (records.length === 0 && removals.length === 0) {
       return { success: false, error: "Nenhum registro para salvar." };
     }
 
-    const rows = records.map((r) => ({
-      enrollment_id: r.enrollmentId,
-      date,
-      status: r.status,
-      justification: r.status === "justified" ? (r.justification?.trim() || null) : null,
-    }));
+    // Delete cleared records
+    if (removals.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("attendance")
+        .delete()
+        .in("enrollment_id", removals)
+        .eq("date", date);
 
-    const { error } = await supabase
-      .from("attendance")
-      .upsert(rows, { onConflict: "enrollment_id,date" });
+      if (deleteError) return { success: false, error: deleteError.message };
+    }
 
-    if (error) return { success: false, error: error.message };
+    // Upsert active records
+    if (records.length > 0) {
+      const rows = records.map((r) => ({
+        enrollment_id: r.enrollmentId,
+        date,
+        status: r.status,
+        justification: r.status === "justified" ? (r.justification?.trim() || null) : null,
+      }));
+
+      const { error } = await supabase
+        .from("attendance")
+        .upsert(rows, { onConflict: "enrollment_id,date" });
+
+      if (error) return { success: false, error: error.message };
+    }
+
     return { success: true, data: null };
   } catch {
     return { success: false, error: "Falha ao salvar chamada." };

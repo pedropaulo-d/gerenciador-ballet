@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type { AttendanceRow, AttendanceStatus, ClassWithLocation } from "@/types/database";
 import { getClassesWithLocation } from "@/app/actions/classes";
@@ -15,18 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { todayISO } from "@/lib/formatters";
+import { useUrlParams } from "@/lib/use-url-params";
 import { LoaderIcon } from "lucide-react";
 
 const NONE = "__none__";
 
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export function AttendanceManager() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const { searchParams, setParams } = useUrlParams("/attendance", NONE);
   const [isPending, startTransition] = useTransition();
 
   // URL state
@@ -38,21 +33,8 @@ export function AttendanceManager() {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [values, setValues] = useState<Map<string, AttendanceStatus>>(new Map());
   const [justifications, setJustifications] = useState<Map<string, string>>(new Map());
+  const [initialIds, setInitialIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-
-  // URL helpers
-  const setParams = useCallback(
-    (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, value] of Object.entries(updates)) {
-        if (!value || value === NONE) params.delete(key);
-        else params.set(key, value);
-      }
-      const qs = params.toString();
-      router.replace(qs ? `?${qs}` : "/attendance", { scroll: false });
-    },
-    [router, searchParams]
-  );
 
   // Load class options
   useEffect(() => {
@@ -69,6 +51,7 @@ export function AttendanceManager() {
         setRows([]);
         setValues(new Map());
         setJustifications(new Map());
+        setInitialIds(new Set());
         return;
       }
       const result = await getAttendanceByClassAndDate(urlClassId, urlDate);
@@ -82,6 +65,7 @@ export function AttendanceManager() {
         }
         setValues(initialValues);
         setJustifications(initialJustifications);
+        setInitialIds(new Set(initialValues.keys()));
       } else {
         toast.error("Erro ao carregar chamada", { description: result.error });
       }
@@ -123,6 +107,10 @@ export function AttendanceManager() {
     });
   }
 
+  // Detect removals: enrollments that had a saved status but were cleared
+  const removals = [...initialIds].filter((id) => !values.has(id));
+  const hasChanges = values.size > 0 || removals.length > 0;
+
   async function handleSave() {
     const records = Array.from(values.entries()).map(([enrollmentId, status]) => ({
       enrollmentId,
@@ -131,11 +119,13 @@ export function AttendanceManager() {
     }));
 
     setSaving(true);
-    const result = await saveAttendance(urlDate, records);
+    const result = await saveAttendance(urlDate, records, removals);
     setSaving(false);
 
     if (result.success) {
       toast.success("Chamada salva!");
+      // Update initial state to reflect saved changes
+      setInitialIds(new Set(values.keys()));
     } else {
       toast.error("Erro ao salvar chamada", { description: result.error });
     }
@@ -183,6 +173,7 @@ export function AttendanceManager() {
           onSave={handleSave}
           saving={saving}
           hasClass={urlClassId !== NONE}
+          hasChanges={hasChanges}
         />
       )}
     </div>

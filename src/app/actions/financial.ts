@@ -1,8 +1,11 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
+
+const supabase = getServiceSupabase();
 import type { MonthlyFeeWithDetails } from "@/types/database";
+import { nowBrasilia } from "@/lib/formatters";
 
 // ---------- Types ----------
 
@@ -26,6 +29,12 @@ export type FinancialPageData = {
 type PendingFeeRow = {
   id: string;
   enrollment: { due_day: number }[];
+};
+
+/** Shape returned by getFinancialByMonth enrollment pre-filter: "id, class:classes(location_id)" */
+type EnrollmentFilterRow = {
+  id: string;
+  class: { location_id: string }[];
 };
 
 /** Shape returned by generateFeesForMonth select: "id, base_fee, class:classes(location:locations(fee_per_student))" */
@@ -79,13 +88,11 @@ export async function getFinancialByMonth(
       const { data: enrollRows } = await enrollQuery;
 
       if (enrollRows) {
+        const typed = enrollRows as EnrollmentFilterRow[];
         const filtered = filters.locationId
-          ? enrollRows.filter(
-              (e: Record<string, unknown>) =>
-                (e.class as Record<string, unknown> | null)?.location_id === filters.locationId
-            )
-          : enrollRows;
-        enrollmentIds = filtered.map((e: Record<string, unknown>) => e.id as string);
+          ? typed.filter((e) => e.class?.[0]?.location_id === filters.locationId)
+          : typed;
+        enrollmentIds = filtered.map((e) => e.id);
       } else {
         enrollmentIds = [];
       }
@@ -94,7 +101,7 @@ export async function getFinancialByMonth(
     let query = supabase
       .from("monthly_fees")
       .select(
-        "*, enrollment:enrollments(*, student:students(*), class:classes(*, location:locations(*)))",
+        "*, enrollment:enrollments(id, due_day, student:students(full_name), class:classes(name, location:locations(name)))",
         { count: "exact" }
       )
       .eq("reference_month", referenceMonth);
@@ -136,7 +143,7 @@ export async function getFinancialByMonth(
  * Auto-mark pending fees as overdue when current date > due_day of reference month.
  */
 async function markOverdueFees(referenceMonth: string): Promise<void> {
-  const now = new Date();
+  const now = nowBrasilia();
   const [year, month] = referenceMonth.split("-").map(Number);
 
   // Only mark overdue if we're in or past the reference month

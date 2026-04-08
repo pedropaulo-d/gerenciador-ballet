@@ -1,7 +1,9 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
+
+const supabase = getServiceSupabase();
 import type { Location, LocationInsert, LocationUpdate } from "@/types/database";
 
 export async function getLocations(): Promise<ActionResult<Location[]>> {
@@ -13,7 +15,7 @@ export async function getLocations(): Promise<ActionResult<Location[]>> {
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Location[] };
-  } catch (err) {
+  } catch {
     return { success: false, error: "Falha ao buscar locais." };
   }
 }
@@ -30,7 +32,7 @@ export async function createLocation(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Location };
-  } catch (err) {
+  } catch {
     return { success: false, error: "Falha ao cadastrar local." };
   }
 }
@@ -49,7 +51,7 @@ export async function updateLocation(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Location };
-  } catch (err) {
+  } catch {
     return { success: false, error: "Falha ao atualizar local." };
   }
 }
@@ -65,7 +67,7 @@ export async function deleteLocation(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: null };
-  } catch (err) {
+  } catch {
     return { success: false, error: "Falha ao excluir local." };
   }
 }

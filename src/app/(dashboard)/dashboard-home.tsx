@@ -8,7 +8,7 @@ import { getFinancialByMonth, type FinancialSummary } from "@/app/actions/financ
 import { getTodayAbsencesCount } from "@/app/actions/student-profile";
 import { getTodayBirthdays, type BirthdayStudent } from "@/app/actions/dashboard";
 import { BirthdayCard } from "@/components/dashboard/birthday-card";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, getCurrentMonth, todayISO } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   MapPinIcon,
@@ -19,16 +19,6 @@ import {
   AlertTriangleIcon,
   XCircleIcon,
 } from "lucide-react";
-
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-}
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 const emptySummary: FinancialSummary = {
   totalNetReceived: 0,
