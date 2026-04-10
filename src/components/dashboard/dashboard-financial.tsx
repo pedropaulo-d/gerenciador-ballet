@@ -34,11 +34,16 @@ export function DashboardFinancial({ summary, isPending }: DashboardFinancialPro
                 </span>
               </div>
               <p className="font-heading text-3xl font-bold text-green-600 leading-tight">
-                {isPending ? "\u2014" : formatCurrency(summary.totalNetReceived)}
+                {isPending ? "\u2014" : formatCurrency(summary.totalGrossReceived)}
               </p>
               <p className="text-xs text-muted-foreground">
                 {isPending ? "" : `${summary.paidCount} de ${summary.feesCount}`}
               </p>
+              {!isPending && summary.totalLocationFees > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Repasses provisionados: {formatCurrency(summary.totalLocationFees)}
+                </p>
+              )}
             </CardContent>
           </Card>
 

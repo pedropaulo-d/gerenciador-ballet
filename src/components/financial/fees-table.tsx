@@ -84,6 +84,11 @@ export function FeesTable({ fees, loading, onPayManually, onUndoPayment }: FeesT
                 <Badge variant={variant} className="shrink-0 mt-1">{label}</Badge>
               </div>
 
+              {/* Amount + details */}
+              <p className="font-heading text-2xl font-bold text-foreground">
+                {formatCurrency(Number(fee.gross_amount))}
+              </p>
+
               {/* Supporting details */}
               <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
@@ -93,14 +98,11 @@ export function FeesTable({ fees, loading, onPayManually, onUndoPayment }: FeesT
                   <Badge variant="secondary">{cls?.location?.name ?? "\u2014"}</Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                  <span>Bruto: {formatCurrency(Number(fee.gross_amount))}</span>
                   {fee.status === "paid" && (
                     <>
                       <span>Asaas: -{formatCurrency(Number(fee.asaas_fee))}</span>
                       <span>Local: -{formatCurrency(Number(fee.location_fee))}</span>
-                      <span className="font-semibold text-green-600">
-                        Liquido: {formatCurrency(Number(fee.net_amount))}
-                      </span>
+                      <span>Liquido: {formatCurrency(Number(fee.net_amount))}</span>
                     </>
                   )}
                   <span>Venc: dia {String(fee.enrollment?.due_day ?? "\u2014").padStart(2, "0")}</span>

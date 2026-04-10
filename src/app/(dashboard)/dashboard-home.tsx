@@ -12,7 +12,8 @@ import { DashboardFinancial } from "@/components/dashboard/dashboard-financial";
 import { getCurrentMonth, todayISO } from "@/lib/formatters";
 
 const emptySummary: FinancialSummary = {
-  totalNetReceived: 0,
+  totalGrossReceived: 0,
+  totalLocationFees: 0,
   totalPending: 0,
   totalOverdue: 0,
   feesCount: 0,

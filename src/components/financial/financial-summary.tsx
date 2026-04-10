@@ -21,11 +21,16 @@ export function FinancialSummary({ summary }: FinancialSummaryProps) {
         </CardHeader>
         <CardContent>
           <p className="text-sm font-semibold text-green-600">
-            {formatCurrency(summary.totalNetReceived)}
+            {formatCurrency(summary.totalGrossReceived)}
           </p>
           <p className="text-xs text-muted-foreground">
             {summary.paidCount} de {summary.feesCount}
           </p>
+          {summary.totalLocationFees > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Repasses: {formatCurrency(summary.totalLocationFees)}
+            </p>
+          )}
         </CardContent>
       </Card>
 

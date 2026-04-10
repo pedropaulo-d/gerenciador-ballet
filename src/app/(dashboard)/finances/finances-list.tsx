@@ -28,7 +28,8 @@ const PAGE_SIZE = 15;
 const ALL = "__all__";
 
 const emptySummary: SummaryData = {
-  totalNetReceived: 0,
+  totalGrossReceived: 0,
+  totalLocationFees: 0,
   totalPending: 0,
   totalOverdue: 0,
   feesCount: 0,
@@ -121,8 +122,8 @@ export function FinancesList() {
     fetchData();
   }
 
-  async function handlePayManually(feeId: string) {
-    const result = await payFeeManually(feeId);
+  async function handlePayManually(feeId: string, receivedAmount: number) {
+    const result = await payFeeManually(feeId, receivedAmount);
     if (result.success) {
       toast.success("Pagamento registrado!");
       fetchData();

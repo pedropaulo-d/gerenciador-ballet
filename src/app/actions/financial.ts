@@ -10,7 +10,8 @@ import { nowBrasilia } from "@/lib/formatters";
 // ---------- Types ----------
 
 export type FinancialSummary = {
-  totalNetReceived: number;
+  totalGrossReceived: number;
+  totalLocationFees: number;
   totalPending: number;
   totalOverdue: number;
   feesCount: number;
@@ -182,11 +183,12 @@ async function markOverdueFees(referenceMonth: string): Promise<void> {
 async function computeSummary(referenceMonth: string): Promise<FinancialSummary> {
   const { data } = await supabase
     .from("monthly_fees")
-    .select("status, gross_amount, net_amount")
+    .select("status, gross_amount, location_fee, net_amount")
     .eq("reference_month", referenceMonth);
 
   const summary: FinancialSummary = {
-    totalNetReceived: 0,
+    totalGrossReceived: 0,
+    totalLocationFees: 0,
     totalPending: 0,
     totalOverdue: 0,
     feesCount: 0,
@@ -199,7 +201,8 @@ async function computeSummary(referenceMonth: string): Promise<FinancialSummary>
 
   for (const fee of data) {
     if (fee.status === "paid") {
-      summary.totalNetReceived += Number(fee.net_amount);
+      summary.totalGrossReceived += Number(fee.gross_amount);
+      summary.totalLocationFees += Number(fee.location_fee);
       summary.paidCount++;
     } else if (fee.status === "overdue") {
       summary.totalOverdue += Number(fee.gross_amount);
@@ -292,10 +295,26 @@ export async function undoPayment(
   feeId: string
 ): Promise<ActionResult> {
   try {
+    // Fetch enrollment base_fee to restore the original gross_amount
+    const { data: fee, error: fetchError } = await supabase
+      .from("monthly_fees")
+      .select("enrollment:enrollments(base_fee)")
+      .eq("id", feeId)
+      .single();
+
+    if (fetchError || !fee) {
+      return { success: false, error: "Mensalidade nao encontrada." };
+    }
+
+    const baseFee = Number(
+      (fee.enrollment as unknown as { base_fee: number }[])?.[0]?.base_fee ?? 0
+    );
+
     const { error } = await supabase
       .from("monthly_fees")
       .update({
         status: "pending",
+        gross_amount: baseFee,
         paid_at: null,
         asaas_fee: 0,
         location_fee: 0,
@@ -310,16 +329,32 @@ export async function undoPayment(
 }
 
 /**
- * Manual payment: mark a fee as paid with current timestamp.
+ * Manual payment: mark a fee as paid with the actual received amount.
+ * Sets asaas_fee to 0 (off-gateway) and updates gross_amount to reflect
+ * the real value received (may differ from original due to discounts/fines).
  */
 export async function payFeeManually(
-  feeId: string
+  feeId: string,
+  receivedAmount: number
 ): Promise<ActionResult> {
   try {
+    if (!Number.isFinite(receivedAmount) || receivedAmount <= 0) {
+      return { success: false, error: "O valor recebido deve ser maior que zero." };
+    }
+
+    // Clamp to 2 decimal places to match numeric(10,2) in the database
+    const sanitized = Math.round(receivedAmount * 100) / 100;
+
+    if (sanitized > 99_999_999.99) {
+      return { success: false, error: "Valor excede o limite permitido." };
+    }
+
     const { error } = await supabase
       .from("monthly_fees")
       .update({
         status: "paid",
+        gross_amount: sanitized,
+        asaas_fee: 0,
         paid_at: new Date().toISOString(),
       })
       .eq("id", feeId);
