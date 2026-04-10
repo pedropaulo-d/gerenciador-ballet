@@ -12,25 +12,35 @@ export function BirthdayCard({ students }: BirthdayCardProps) {
   if (students.length === 0) return null;
 
   return (
-    <Card size="sm" className="border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950">
-      <CardContent className="flex items-start gap-3 py-3">
-        <CakeIcon className="mt-0.5 size-5 shrink-0 text-pink-500" />
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-semibold text-pink-700 dark:text-pink-300">
+    <Card
+      className="border-2 border-primary/30 bg-gradient-to-r from-secondary to-secondary/60 shadow-md shadow-primary/[0.06]"
+    >
+      <CardContent className="flex flex-col gap-4 py-6 px-5">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15">
+            <CakeIcon className="size-5 text-primary" />
+          </div>
+          <p className="font-heading text-2xl font-bold tracking-tight text-foreground">
             {students.length === 1
               ? "Aniversariante do dia!"
               : `${students.length} aniversariantes hoje!`}
           </p>
+        </div>
+
+        {/* Names — protagonistas */}
+        <div className="flex flex-col gap-3 pl-13">
           {students.map((s) => (
-            <p key={s.id} className="text-sm text-pink-600 dark:text-pink-400">
-              {s.fullName}
+            <div key={s.id} className="flex flex-col">
+              <p className="font-heading text-2xl font-bold tracking-tight text-foreground text-shadow-gold">
+                {s.fullName}
+              </p>
               {s.className && (
-                <span className="text-pink-400 dark:text-pink-500">
-                  {" "}
-                  — {s.className}
-                </span>
+                <p className="text-sm text-muted-foreground">
+                  {s.className}
+                </p>
               )}
-            </p>
+            </div>
           ))}
         </div>
       </CardContent>

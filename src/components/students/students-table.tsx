@@ -7,9 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardAction,
 } from "@/components/ui/card";
 import {
   PencilIcon,
@@ -80,24 +77,32 @@ export function StudentsTable({
 
         return (
           <Card key={student.id} size="sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  className="text-left hover:underline"
-                  onClick={() => onViewProfile(student)}
-                >
-                  {student.full_name}
-                </button>
-                {!student.is_active && (
-                  <Badge variant="secondary">Inativa</Badge>
-                )}
-                <Badge variant={student.is_internal ? "default" : "outline"}>
-                  {student.is_internal ? "Interna" : "Externa"}
-                </Badge>
-              </CardTitle>
-              <CardAction>
-                <div className="flex gap-1">
+            <CardContent className="flex flex-col gap-3 py-5 px-5">
+              {/* Row: Name + Actions */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  {/* The star: student name */}
+                  <button
+                    type="button"
+                    className="text-left"
+                    onClick={() => onViewProfile(student)}
+                  >
+                    <h3 className="font-heading text-xl font-bold tracking-tight text-foreground hover:text-primary transition-colors">
+                      {student.full_name}
+                    </h3>
+                  </button>
+                  {/* Badges */}
+                  <div className="flex items-center gap-1.5">
+                    {!student.is_active && (
+                      <Badge variant="secondary">Inativa</Badge>
+                    )}
+                    <Badge variant={student.is_internal ? "default" : "outline"}>
+                      {student.is_internal ? "Interna" : "Externa"}
+                    </Badge>
+                  </div>
+                </div>
+                {/* Actions */}
+                <div className="flex shrink-0 gap-1">
                   <Button
                     variant="ghost"
                     size="icon-xs"
@@ -120,42 +125,44 @@ export function StudentsTable({
                     <Trash2Icon />
                   </Button>
                 </div>
-              </CardAction>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-              {student.guardian_phone ? (
-                <div className="flex items-center gap-2">
-                  <PhoneIcon className="size-3.5 shrink-0" />
-                  <span>
-                    {student.guardian_name} · {student.guardian_phone}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <UsersIcon className="size-3.5 shrink-0" />
-                  <span>Resp: {student.guardian_name}</span>
-                </div>
-              )}
-              {activeEnrollments.length > 0 ? (
-                activeEnrollments.map((enrollment) => (
-                  <div key={enrollment.id} className="flex items-center gap-2">
-                    <GraduationCapIcon className="size-3.5 shrink-0" />
-                    <span>{enrollment.class.name}</span>
-                    <MapPinIcon className="size-3 shrink-0" />
-                    <Badge variant="secondary">
-                      {enrollment.class.location.name}
-                    </Badge>
-                    <Badge variant="outline">
-                      {validityLabel(enrollment.validity_type)}
-                    </Badge>
+              </div>
+
+              {/* Supporting details */}
+              <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+                {student.guardian_phone ? (
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon className="size-3.5 shrink-0" />
+                    <span>
+                      {student.guardian_name} · {student.guardian_phone}
+                    </span>
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center gap-2 text-muted-foreground/60">
-                  <GraduationCapIcon className="size-3.5 shrink-0" />
-                  <span>Sem matrícula ativa</span>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <UsersIcon className="size-3.5 shrink-0" />
+                    <span>Resp: {student.guardian_name}</span>
+                  </div>
+                )}
+                {activeEnrollments.length > 0 ? (
+                  activeEnrollments.map((enrollment) => (
+                    <div key={enrollment.id} className="flex items-center gap-2">
+                      <GraduationCapIcon className="size-3.5 shrink-0" />
+                      <span>{enrollment.class.name}</span>
+                      <MapPinIcon className="size-3 shrink-0" />
+                      <Badge variant="secondary">
+                        {enrollment.class.location.name}
+                      </Badge>
+                      <Badge variant="outline">
+                        {validityLabel(enrollment.validity_type)}
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex items-center gap-2 text-muted-foreground/60">
+                    <GraduationCapIcon className="size-3.5 shrink-0" />
+                    <span>Sem matricula ativa</span>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         );

@@ -1,169 +1,125 @@
-# Projeto: Petit Allegro Manager
+# Petit Allegro Manager — V1 CONCLUÍDA
 
-Um sistema de gestão para uma escola de ballet itinerante que atua dentro de creches e escolas particulares.
+Sistema de gestao para escola de ballet itinerante que atua dentro de creches e escolas particulares.
 
-## Stack Tecnológico
+**Status:** V1 completa e funcional (lançamento abril 2026).
+
+## Stack
 
 - **Framework:** Next.js 16 (App Router) + React 19 + TypeScript 5
-- **Estilização:** Tailwind CSS 4 + shadcn/ui 4
-- **Backend/Database:** Supabase (PostgreSQL, Auth, Row Level Security)
-- **Integrações futuras:** API Asaas (Webhooks de pagamento), API Google Sheets (orçamento pessoal)
+- **UI:** Tailwind CSS 4 + shadcn/ui 4 — tema "Teatro Português" (rosa ballet + ouro + ivory + damask)
+- **Backend:** Supabase (PostgreSQL, Auth, RLS) — `service_role` em Server Actions, `anon` key so no client
+- **Integracoes:** API Asaas (webhooks de pagamento)
 
-## Estrutura do Projeto
+## Arquitetura
 
 ```
 src/
 ├── app/
-│   ├── actions/               # Server Actions (camada de serviço)
+│   ├── actions/               # Server Actions ("use server") — retornam ActionResult<T>
 │   │   ├── locations.ts       # CRUD locations
 │   │   ├── classes.ts         # CRUD classes (filtro por location)
-│   │   ├── students.ts        # CRUD students + criação unificada student+enrollment
-│   │   ├── financial.ts       # Listagem paginada, geração de mensalidades, baixa manual, desfazer pagamento, lógica de overdue, filtros
-│   │   ├── attendance.ts      # Busca chamada por turma+data, salvamento em lote (upsert)
-│   │   ├── student-profile.ts # getStudentSummary (perfil 360°) + getTodayAbsencesCount
-│   │   ├── dashboard.ts       # getTodayBirthdays (aniversariantes do dia)
-│   │   └── import-students.ts # Importação CSV com matching fuzzy de turmas
-│   ├── api/
-│   │   └── webhooks/
-│   │       └── asaas/
-│   │           └── route.ts   # Webhook POST Asaas (pagamentos)
-│   ├── (dashboard)/           # Route group com layout (header + fixed 5-item bottom nav + sheet "Mais")
-│   │   ├── page.tsx           # Dashboard home (/)
-│   │   ├── dashboard-home.tsx # Client component do dashboard (aniversarios + stats + faltas hoje)
-│   │   ├── layout.tsx
-│   │   ├── locations/
-│   │   │   ├── page.tsx
-│   │   │   └── location-list.tsx
-│   │   ├── classes/
-│   │   │   ├── page.tsx
-│   │   │   └── class-list.tsx
-│   │   ├── students/
-│   │   │   ├── page.tsx
-│   │   │   └── student-list.tsx
-│   │   ├── finances/
-│   │   │   ├── page.tsx
-│   │   │   └── finances-list.tsx
-│   │   ├── attendance/
-│   │   │   ├── page.tsx
-│   │   │   └── attendance-manager.tsx
-│   │   └── import/
-│   │       └── page.tsx
-│   ├── layout.tsx             # Root layout (Toaster, fonts)
-│   ├── page.tsx               # (removido — dashboard é servido pelo route group)
-│   └── globals.css
+│   │   ├── students.ts        # CRUD students + enrollment + busca paginada
+│   │   ├── financial.ts       # Mensalidades: listagem, geracao lote, baixa, undo, overdue
+│   │   ├── attendance.ts      # Chamada: busca turma+data, upsert lote
+│   │   ├── student-profile.ts # Perfil 360 + getTodayAbsencesCount
+│   │   ├── dashboard.ts       # getTodayBirthdays
+│   │   └── import-students.ts # Importacao CSV com matching fuzzy
+│   ├── api/webhooks/asaas/    # Webhook POST Asaas (token validation)
+│   ├── (dashboard)/           # Route group (header + bottom nav + sheet "Mais")
+│   │   ├── dashboard-home.tsx # Home: aniversarios, metricas, resumo financeiro
+│   │   ├── layout.tsx         # Header + BottomNav + Sheet "Mais"
+│   │   ├── locations/         # CRUD locais
+│   │   ├── classes/           # CRUD turmas (filtro por local)
+│   │   ├── students/          # CRUD alunas + perfil 360
+│   │   ├── finances/          # Financeiro paginado com filtros
+│   │   ├── attendance/        # Chamada mobile-first
+│   │   └── import/            # Importacao CSV
+│   ├── layout.tsx             # Root (Toaster, fonts: Playfair Display + Inter)
+│   └── globals.css            # Tema Teatro Português (oklch, damask SVG, gold utils)
 ├── components/
-│   ├── ui/                    # Componentes shadcn/ui (não editar manualmente)
-│   ├── locations/
-│   │   ├── location-form.tsx
-│   │   ├── locations-table.tsx
-│   │   ├── location-form-dialog.tsx
-│   │   └── location-delete-dialog.tsx
-│   ├── classes/
-│   │   ├── class-form.tsx
-│   │   ├── class-form-dialog.tsx
-│   │   └── class-delete-dialog.tsx
-│   ├── students/
-│   │   ├── student-form.tsx
-│   │   ├── students-table.tsx
-│   │   ├── student-form-dialog.tsx
-│   │   ├── student-delete-dialog.tsx
-│   │   ├── student-filters.tsx
-│   │   ├── student-pagination.tsx
-│   │   └── student-profile-sheet.tsx  # Sheet 360° (perfil, financeiro, frequência, WhatsApp)
-│   ├── dashboard/
-│   │   └── birthday-card.tsx  # Card de aniversariantes do dia
-│   ├── financial/
-│   │   ├── month-selector.tsx
-│   │   ├── financial-filters.tsx
-│   │   ├── financial-summary.tsx
-│   │   ├── fees-table.tsx
-│   │   ├── fees-pagination.tsx
-│   │   └── pay-fee-dialog.tsx
-│   └── attendance/
-│       └── attendance-list.tsx
+│   ├── ui/                    # shadcn/ui + pagination-controls + delete-dialog
+│   ├── locations/             # form, table, form-dialog, delete-dialog
+│   ├── classes/               # form, table, form-dialog, delete-dialog
+│   ├── students/              # form, table, form-dialog, delete-dialog, filters, profile-sheet
+│   ├── dashboard/             # birthday-card, dashboard-metrics, dashboard-financial
+│   ├── financial/             # month-selector, filters, summary, fees-table, pay-fee-dialog
+│   └── attendance/            # attendance-list
 ├── lib/
-│   ├── supabase.ts            # Client Supabase (NEXT_PUBLIC_ vars)
-│   ├── action-result.ts       # Tipo ActionResult<T> compartilhado
-│   ├── formatters.ts          # formatCurrency, DAY_LABELS, sortedDays, validityLabel, formatTime
-│   └── utils.ts               # cn() e utilitários gerais
-├── types/
-│   └── database.ts            # Tipagens do banco de dados + Insert/Update/Join types
-supabase/
-└── schema.sql                 # Script SQL completo do banco
+│   ├── supabase.ts            # Clients: anon (public) + service_role (server)
+│   ├── action-result.ts       # ActionResult<T> type
+│   ├── formatters.ts          # Moeda, datas, labels, timezone Brasilia
+│   ├── use-url-params.ts      # Hook filtros via URL search params
+│   └── utils.ts               # cn()
+├── types/database.ts          # Tipagens do banco + Insert/Update/Join types
+supabase/schema.sql            # Script SQL completo (6 tabelas, RLS, triggers, GIN)
 ```
 
-### Status dos Módulos
+## Banco de Dados (6 tabelas)
 
-| Módulo | Status |
+| Tabela | Descricao |
 |---|---|
-| Locais (CRUD) | Concluído |
-| Turmas (CRUD + filtro por local) | Concluído |
-| Alunas (CRUD + busca + filtros + paginação + perfil 360°) | Concluído |
-| Dashboard (stats, financeiro do mês, faltas hoje) | Concluído |
-| Importação CSV | Concluído |
-| Financeiro (mensalidades, paginação, baixa manual, overdue automático) | Concluído |
-| Webhook Asaas | Estrutura pronta (validação de token pendente) |
-| Chamada (Frequência: presença, falta, justificada) | Concluído |
+| `locations` | Escolas parceiras. `fee_per_student` (taxa R$/aluna) |
+| `classes` | Turmas. `days_of_week` (smallint[]) + horario |
+| `students` | Alunas + responsavel, `is_internal`, `medical_notes`, `internal_observations` |
+| `enrollments` | student ↔ class. Status, validade, `base_fee`, `due_day` (5 ou 7) |
+| `monthly_fees` | Mensalidades. `net_amount` (gerada = gross - asaas_fee - location_fee) |
+| `attendance` | Chamada diaria. present/absent/justified. Unique (enrollment_id, date) |
 
-## Banco de Dados — Esquema
+## Identidade Visual — Tema "Teatro Português"
 
-6 tabelas principais, todas com UUID como PK e timestamps automáticos:
+- **Paleta:** Rosa ballet (primary), ouro envelhecido (--gold), marfim quente (background)
+- **Tipografia:** Playfair Display (headings) + Inter (body)
+- **Background:** Damask SVG pattern (opacity 4%)
+- **Cards:** Bordas douradas sutis, sombras quentes
+- **Dark mode:** Definido no CSS mas nao ativado (sem ThemeProvider)
 
-| Tabela | Descrição |
-|---|---|
-| `locations` | Escolas/creches parceiras. `fee_per_student` (valor fixo em R$ por aluna) |
-| `classes` | Turmas vinculadas a um location. `days_of_week` (smallint[], múltiplos dias) + horário |
-| `students` | Alunas com dados do responsável, flag `is_internal`, `medical_notes` e `internal_observations` |
-| `enrollments` | Liga student ↔ class, com status, validade, `base_fee` (valor base da mensalidade) e `due_day` (dia de vencimento: 5 ou 7) |
-| `monthly_fees` | Mensalidades com taxa Asaas, taxa do local e `net_amount` (coluna gerada) |
-| `attendance` | Chamada diária. Status: `present`, `absent`, `justified`. Unique em `(enrollment_id, date)` |
+## Regras de Negocio
 
-- Trigger automático de `updated_at` em todas as tabelas.
-- Índices GIN (`pg_trgm`) em `students` para busca textual parcial (ILIKE) nas colunas `full_name`, `guardian_name`, `guardian_phone` e `guardian_cpf`.
-- RLS habilitado com políticas temporárias (ajustar após configurar Auth).
-- Script completo: `supabase/schema.sql`
+1. Aulas em creches/escolas parceiras — cada local cobra taxa fixa/aluna
+2. Turmas pertencem a um local, multiplos dias/semana
+3. Matriculas: active/inactive/pending, validade semester/annual, due_day 5 ou 7
+4. Financeiro: valor bruto no app, descontos/juros do Asaas, conciliacao via webhook
+5. Mensalidades geradas em lote (idempotente), overdue automatico, baixa manual + undo
+6. Webhook Asaas: PAYMENT_RECEIVED/CONFIRMED/OVERDUE/DELETED/REFUNDED
+7. Chamada mobile-first: 3 status com toggle, upsert em lote
+8. Perfil 360: dados pessoais, matricula, observacoes, financeiro, frequencia, WhatsApp
+9. Dashboard: aniversariantes, metricas (locais/turmas/faltas), resumo financeiro do mes
+10. Status financeiro: pendente=laranja, pago=verde, vencido=vermelho, cancelado=cinza
 
-## Regras de Negócio e Domínio
+## Padrao por Modulo
 
-1. **Locais/Parceiros:** A escola não tem sede física. As aulas ocorrem em "Locais" (creches, escolas particulares). Cada Local possui uma "Taxa de Repasse por Aluna" (valor fixo em R$, ex: R$ 20,00) que é cobrada por aluna matriculada e deduzida do faturamento.
-2. **Alunas e Turmas:** Alunas são matriculadas em Turmas. Uma Turma pertence a um Local e pode ter aulas em múltiplos dias da semana. Alunas podem ser internas (da própria creche) ou externas. A listagem de turmas deve sempre ser contextualizada por Local (filtro Select) para evitar ambiguidade entre nomes repetidos.
-3. **Matrículas:** Possuem status (active, inactive, pending), tipo de validade (semester, annual) e dia de vencimento (`due_day`: 5 ou 7). Os pais escolhem entre dia 05 ou 07 de cada mês.
-4. **Financeiro:** O app registra apenas o Valor Base bruto da mensalidade (`base_fee` em enrollments). O cálculo de descontos (ex: 10% até o vencimento) e juros é responsabilidade exclusiva do Asaas. O app concilia o valor líquido recebido via webhook. Coluna `net_amount` em `monthly_fees` é gerada automaticamente (gross - asaas_fee - location_fee). Mensalidades são geradas em lote por mês via `generateFeesForMonth()`. Mensalidades pendentes são automaticamente marcadas como "overdue" quando a data atual ultrapassa o `due_day` do mês de referência. Baixa manual disponível via `payFeeManually()`. **Desfazer pagamento** via `undoPayment()` reverte status para 'pending' e zera `paid_at`, `asaas_fee` e `location_fee`. Filtros avançados por status, local e turma via URL search params.
-   - **Cores de status:** Pendente = Laranja (warning), Pago = Verde (success), Vencido = Vermelho (destructive), Cancelado = Cinza (secondary).
-5. **Webhooks Asaas:** Tratados nativamente pelo App Router em `src/app/api/webhooks/asaas/route.ts` (POST). Eventos suportados: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `PAYMENT_DELETED`, `PAYMENT_REFUNDED`. O webhook atualiza `monthly_fees.status`, `asaas_fee` e `paid_at`.
-6. **Chamada (Frequência):** Mobile-First, focada em toques rápidos. Seletores de data (padrão hoje) e turma no topo. Lista de alunas com 3 botões circulares por linha: Presente (verde), Falta (vermelho), Justificada (amarelo). Toggle: clicar no mesmo status desmarca. Salvamento em lote via `saveAttendance()` (upsert por `enrollment_id + date`). Tabela `attendance` com constraint unique `(enrollment_id, date)`. Campo `justification` (text, nullable) para motivo de falta justificada.
-7. **Perfil 360° da Aluna:** Sheet lateral (`student-profile-sheet.tsx`) acessado via clique no nome da aluna ou botão "Ver Perfil" na tabela. Consolida: dados pessoais, matrícula atual (turma + local), **observações importantes** (médicas e pedagógicas), status financeiro do mês + histórico de inadimplência, frequência do mês (P/F/J), contato do responsável com link clicável para WhatsApp (`wa.me/55...`). Dados via `getStudentSummary()`.
-8. **Dashboard:** Home (`/`) com **alerta de aniversariantes** (card rosa no topo, só aparece se houver), cards de Locais, Turmas e **Faltas Hoje** (com destaque visual vermelho se > 0), resumo financeiro do mês (recebido, pendente, vencido), link rápido para financeiro completo. Aniversários via `getTodayBirthdays()`, faltas via `getTodayAbsencesCount()`.
+1. **Server Actions** (`actions/*.ts`): Supabase queries, retornam `ActionResult<T>`, try/catch
+2. **Componentes** (`components/`): UI pura, props + callbacks, sem Server Actions
+3. **Pagina/List** (`(dashboard)/`): Client component orquestrando estado, dialogs, actions, toasts
 
-## Arquitetura — Padrão para CRUDs
+## Navegacao
 
-Cada módulo (locations, students, classes, etc.) segue esta estrutura em 3 camadas:
+- **Header:** Logo "Petit Allegro" + icone flor-de-lis dourada
+- **Bottom Nav (5):** Inicio, Chamada, Alunas, Financeiro, Mais
+- **Sheet "Mais":** Turmas, Locais, Importar Alunas
 
-1. **Server Actions** (`src/app/actions/<entidade>.ts`): Toda comunicação com Supabase. Marcados com `"use server"`. Retornam `ActionResult<T>` (`{ success, data }` ou `{ success, error }`). Envolvem chamadas em try/catch.
-2. **Componentes de domínio** (`src/components/<entidade>/`): Formulários e peças reutilizáveis. Recebem dados via props e disparam callbacks (`onSubmit`). Não conhecem Server Actions diretamente.
-3. **Página/List** (`src/app/(dashboard)/<entidade>/`): Client component que orquestra estado, dialogs e chama as Server Actions. Exibe feedback via `toast` (sonner).
+## Diretrizes
 
-## Navegação
-
-- **Header (Top):** Logo "Petit Allegro" como link para Home (`/`).
-- **Bottom Nav (Fixed, 5 itens):** Inicio (`/`), Chamada (`/attendance`), Alunas (`/students`), Financeiro (`/finances`), Mais.
-- **Menu "Mais":** Sheet (bottom) com links secundários: Turmas (`/classes`), Locais (`/locations`), Importar Alunas (`/import`).
-- Botão "Importar" também acessível no header da página `/students` ao lado de "Nova Aluna".
-
-## Diretrizes de Código
-
-- Escreva código TypeScript limpo e tipado.
-- Priorize componentes funcionais e React Hooks.
-- Mantenha a interface minimalista e focada na usabilidade pelo celular.
-- Use o alias `@/*` para imports (mapeado para `src/*`).
-- Sempre que criar/alterar tabelas no Supabase, atualize `supabase/schema.sql` e `src/types/database.ts`.
-- Estruture o banco priorizando normalização, mas facilitando consultas de relatórios financeiros mensais.
-- Feedback visual obrigatório: use `toast.success` / `toast.error` (sonner) em toda operação de escrita.
+- TypeScript strict, componentes funcionais, React Hooks
+- Mobile-first, minimalista
+- Alias `@/*` → `src/*`
+- Alteracoes no banco: atualizar `supabase/schema.sql` + `types/database.ts`
+- Feedback obrigatorio: `toast.success` / `toast.error` em toda operacao de escrita
+- Seguranca: chaves via `process.env`, RLS habilitado (endurecer apos Auth)
 
 ## Comandos
 
 ```bash
-npm run dev    # Servidor de desenvolvimento
-npm run build  # Build de produção
+npm run dev    # Dev server
+npm run build  # Build producao
 npm run lint   # ESLint
 ```
+
+## Pendencias para V2
+
+- [ ] Autenticacao (Supabase Auth) + endurecer RLS
+- [ ] Dark mode (tema CSS ja definido, falta ThemeProvider)
+- [ ] PWA / Service Worker para uso offline
+- [ ] Relatorios e exportacao (PDF/Excel)
+- [ ] Notificacoes push (lembrete de aula, cobranca)

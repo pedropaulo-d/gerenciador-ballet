@@ -132,8 +132,8 @@ export function AttendanceManager() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl font-semibold">Chamada</h1>
+    <div className="flex flex-col gap-6">
+      <h1 className="font-heading text-2xl font-bold tracking-tight text-shadow-gold">Chamada</h1>
 
       <div className="grid grid-cols-2 gap-2">
         <Input

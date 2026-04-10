@@ -89,12 +89,14 @@ export function AttendanceList({
 
         return (
           <Card key={row.enrollmentId} size="sm">
-            <CardContent className="flex flex-col gap-2 py-3">
+            <CardContent className="flex flex-col gap-3 py-4 px-5">
               <div className="flex items-center justify-between gap-3">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                {/* The star: student name */}
+                <h3 className="min-w-0 flex-1 truncate font-heading text-xl font-bold tracking-tight text-foreground">
                   {row.studentName}
-                </span>
-                <div className="flex gap-1.5">
+                </h3>
+                {/* Status buttons */}
+                <div className="flex shrink-0 gap-1.5">
                   {STATUS_OPTIONS.map((opt) => {
                     const isActive = current === opt.value;
                     return (

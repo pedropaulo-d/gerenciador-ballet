@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   DollarSignIcon,
@@ -77,61 +75,70 @@ export function FeesTable({ fees, loading, onPayManually, onUndoPayment }: FeesT
 
         return (
           <Card key={fee.id} size="sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-1.5">
-                {student?.full_name ?? "—"}
-                <Badge variant={variant}>{label}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <GraduationCapIcon className="size-3.5 shrink-0" />
-                <span>{cls?.name ?? "—"}</span>
-                <MapPinIcon className="size-3 shrink-0" />
-                <Badge variant="secondary">{cls?.location?.name ?? "—"}</Badge>
+            <CardContent className="flex flex-col gap-3 py-5 px-5">
+              {/* The star: student name + status badge */}
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                  {student?.full_name ?? "\u2014"}
+                </h3>
+                <Badge variant={variant} className="shrink-0 mt-1">{label}</Badge>
               </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span>Bruto: {formatCurrency(Number(fee.gross_amount))}</span>
-                {fee.status === "paid" && (
-                  <>
-                    <span>Asaas: -{formatCurrency(Number(fee.asaas_fee))}</span>
-                    <span>Local: -{formatCurrency(Number(fee.location_fee))}</span>
-                    <span className="font-semibold text-green-600">
-                      Liquido: {formatCurrency(Number(fee.net_amount))}
-                    </span>
-                  </>
-                )}
-                <span>Venc: dia {String(fee.enrollment?.due_day ?? "—").padStart(2, "0")}</span>
+
+              {/* Supporting details */}
+              <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <GraduationCapIcon className="size-3.5 shrink-0" />
+                  <span>{cls?.name ?? "\u2014"}</span>
+                  <MapPinIcon className="size-3 shrink-0" />
+                  <Badge variant="secondary">{cls?.location?.name ?? "\u2014"}</Badge>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <span>Bruto: {formatCurrency(Number(fee.gross_amount))}</span>
+                  {fee.status === "paid" && (
+                    <>
+                      <span>Asaas: -{formatCurrency(Number(fee.asaas_fee))}</span>
+                      <span>Local: -{formatCurrency(Number(fee.location_fee))}</span>
+                      <span className="font-semibold text-green-600">
+                        Liquido: {formatCurrency(Number(fee.net_amount))}
+                      </span>
+                    </>
+                  )}
+                  <span>Venc: dia {String(fee.enrollment?.due_day ?? "\u2014").padStart(2, "0")}</span>
+                </div>
               </div>
-              <div className="mt-1 flex items-center gap-2">
-                {canPay && onPayManually && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-fit"
-                    onClick={() => onPayManually(fee)}
-                  >
-                    <HandCoinsIcon className="size-3.5" />
-                    Receber Manualmente
-                  </Button>
-                )}
-                {canUndo && onUndoPayment && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-fit text-muted-foreground"
-                    disabled={isUndoing}
-                    onClick={() => handleUndo(fee.id)}
-                  >
-                    {isUndoing ? (
-                      <LoaderIcon className="size-3.5 animate-spin" />
-                    ) : (
-                      <Undo2Icon className="size-3.5" />
-                    )}
-                    Desfazer
-                  </Button>
-                )}
-              </div>
+
+              {/* Actions */}
+              {(canPay || canUndo) && (
+                <div className="flex items-center gap-2 pt-1">
+                  {canPay && onPayManually && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-fit"
+                      onClick={() => onPayManually(fee)}
+                    >
+                      <HandCoinsIcon className="size-3.5" />
+                      Receber Manualmente
+                    </Button>
+                  )}
+                  {canUndo && onUndoPayment && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-fit text-muted-foreground"
+                      disabled={isUndoing}
+                      onClick={() => handleUndo(fee.id)}
+                    >
+                      {isUndoing ? (
+                        <LoaderIcon className="size-3.5 animate-spin" />
+                      ) : (
+                        <Undo2Icon className="size-3.5" />
+                      )}
+                      Desfazer
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         );

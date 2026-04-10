@@ -7,9 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardAction,
 } from "@/components/ui/card";
 import {
   PencilIcon,
@@ -58,15 +55,18 @@ export function LocationsTable({
     <div className="flex flex-col gap-3">
       {locations.map((location) => (
         <Card key={location.id} size="sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {location.name}
-              {!location.is_active && (
-                <Badge variant="secondary">Inativo</Badge>
-              )}
-            </CardTitle>
-            <CardAction>
-              <div className="flex gap-1">
+          <CardContent className="flex flex-col gap-3 py-5 px-5">
+            {/* Name + Actions */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                  {location.name}
+                </h3>
+                {!location.is_active && (
+                  <Badge variant="secondary">Inativo</Badge>
+                )}
+              </div>
+              <div className="flex shrink-0 gap-1">
                 <Button
                   variant="ghost"
                   size="icon-xs"
@@ -82,20 +82,22 @@ export function LocationsTable({
                   <Trash2Icon />
                 </Button>
               </div>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-            {location.address && (
+            </div>
+
+            {/* Details */}
+            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+              {location.address && (
+                <div className="flex items-center gap-2">
+                  <MapPinIcon className="size-3.5 shrink-0" />
+                  <span>{location.address}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
-                <MapPinIcon className="size-3.5 shrink-0" />
-                <span>{location.address}</span>
+                <BanknoteIcon className="size-3.5 shrink-0" />
+                <span>
+                  Taxa: {formatCurrency(Number(location.fee_per_student))} / aluna
+                </span>
               </div>
-            )}
-            <div className="flex items-center gap-2">
-              <BanknoteIcon className="size-3.5 shrink-0" />
-              <span>
-                Taxa: {formatCurrency(Number(location.fee_per_student))} / aluna
-              </span>
             </div>
           </CardContent>
         </Card>

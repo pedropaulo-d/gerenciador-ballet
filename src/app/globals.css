@@ -9,7 +9,10 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-gold-muted: var(--gold-muted);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,72 +52,100 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Warm ivory — perceptibly warm, antique marble */
+  --background: oklch(0.955 0.012 55);
+  /* Warm charcoal — sepia-deep, never pure black */
+  --foreground: oklch(0.23 0.008 50);
+
+  /* Cards: pure white to float above ivory */
+  --card: oklch(0.995 0.002 75);
+  --card-foreground: oklch(0.23 0.008 50);
+
+  --popover: oklch(0.995 0.002 75);
+  --popover-foreground: oklch(0.23 0.008 50);
+
+  /* Rosa ballet — blush rose, warm and dignified, saturated enough to see */
+  --primary: oklch(0.73 0.08 25);
+  --primary-foreground: oklch(0.99 0.002 75);
+
+  /* Light blush tint */
+  --secondary: oklch(0.95 0.016 28);
+  --secondary-foreground: oklch(0.33 0.025 28);
+
+  /* Warm muted — soft taupe */
+  --muted: oklch(0.94 0.01 55);
+  --muted-foreground: oklch(0.52 0.018 40);
+
+  /* Warm accent — faint blush */
+  --accent: oklch(0.945 0.018 28);
+  --accent-foreground: oklch(0.28 0.02 28);
+
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Warm taupe borders */
+  --border: oklch(0.895 0.012 50);
+  --input: oklch(0.895 0.012 50);
+  --ring: oklch(0.73 0.08 25);
+
+  /* Gold — aged bronze, teatro chandelier, rich and visible */
+  --gold: oklch(0.745 0.13 80);
+  --gold-light: oklch(0.88 0.065 80);
+  --gold-muted: oklch(0.82 0.08 80);
+
+  /* Charts — blush to rose gradient */
+  --chart-1: oklch(0.82 0.05 25);
+  --chart-2: oklch(0.73 0.08 25);
+  --chart-3: oklch(0.62 0.07 25);
+  --chart-4: oklch(0.52 0.05 30);
+  --chart-5: oklch(0.42 0.03 35);
+
+  --radius: 0.75rem;
+
+  --sidebar: oklch(0.965 0.008 55);
+  --sidebar-foreground: oklch(0.23 0.008 50);
+  --sidebar-primary: oklch(0.73 0.08 25);
+  --sidebar-primary-foreground: oklch(0.99 0.002 75);
+  --sidebar-accent: oklch(0.945 0.018 28);
+  --sidebar-accent-foreground: oklch(0.28 0.02 28);
+  --sidebar-border: oklch(0.895 0.012 50);
+  --sidebar-ring: oklch(0.73 0.08 25);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.155 0.01 50);
+  --foreground: oklch(0.94 0.006 75);
+  --card: oklch(0.195 0.01 50);
+  --card-foreground: oklch(0.94 0.006 75);
+  --popover: oklch(0.195 0.01 50);
+  --popover-foreground: oklch(0.94 0.006 75);
+  --primary: oklch(0.78 0.065 25);
+  --primary-foreground: oklch(0.17 0.01 50);
+  --secondary: oklch(0.27 0.018 28);
+  --secondary-foreground: oklch(0.94 0.006 75);
+  --muted: oklch(0.27 0.01 50);
+  --muted-foreground: oklch(0.62 0.018 50);
+  --accent: oklch(0.27 0.018 28);
+  --accent-foreground: oklch(0.94 0.006 75);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.78 0.065 25);
+  --gold: oklch(0.745 0.13 80);
+  --gold-light: oklch(0.38 0.065 80);
+  --gold-muted: oklch(0.5 0.08 80);
+  --chart-1: oklch(0.82 0.05 25);
+  --chart-2: oklch(0.73 0.08 25);
+  --chart-3: oklch(0.62 0.07 25);
+  --chart-4: oklch(0.52 0.05 30);
+  --chart-5: oklch(0.42 0.03 35);
+  --sidebar: oklch(0.195 0.01 50);
+  --sidebar-foreground: oklch(0.94 0.006 75);
+  --sidebar-primary: oklch(0.78 0.065 25);
+  --sidebar-primary-foreground: oklch(0.94 0.006 75);
+  --sidebar-accent: oklch(0.27 0.018 28);
+  --sidebar-accent-foreground: oklch(0.94 0.006 75);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.78 0.065 25);
 }
 
 @layer base {
@@ -126,5 +157,24 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* ─── Damask theatrical background pattern ─── */
+@layer base {
+  body {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cg fill='%23C5A059' fill-opacity='0.04'%3E%3Cpath d='M30 8c2 5 2 10 0 14c-2-4-2-9 0-14z'/%3E%3Cpath d='M30 38c2 5 2 10 0 14c-2-4-2-9 0-14z'/%3E%3Cpath d='M8 30c5-2 10-2 14 0c-4 2-9 2-14 0z'/%3E%3Cpath d='M38 30c5-2 10-2 14 0c-4 2-9 2-14 0z'/%3E%3Ccircle cx='30' cy='30' r='1.5'/%3E%3Cpath d='M0 0c2 3 2 5 0 7c-2-2-2-4 0-7z'/%3E%3Cpath d='M60 0c2 3 2 5 0 7c-2-2-2-4 0-7z'/%3E%3Cpath d='M0 60c2-3 2-5 0-7c-2 2-2 4 0 7z'/%3E%3Cpath d='M60 60c2-3 2-5 0-7c-2 2-2 4 0 7z'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 60px 60px;
+  }
+}
+
+/* ─── Theatrical utilities ─── */
+@layer utilities {
+  .text-shadow-gold {
+    text-shadow: 0 1px 2px oklch(0.745 0.13 80 / 0.35);
+  }
+  .text-shadow-gold-lg {
+    text-shadow: 0 1px 3px oklch(0.745 0.13 80 / 0.45), 0 0 12px oklch(0.745 0.13 80 / 0.1);
   }
 }

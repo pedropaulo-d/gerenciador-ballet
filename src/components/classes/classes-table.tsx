@@ -7,9 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardAction,
 } from "@/components/ui/card";
 import {
   PencilIcon,
@@ -65,20 +62,25 @@ export function ClassesTable({
     <div className="flex flex-col gap-3">
       {classes.map((cls) => (
         <Card key={cls.id} size="sm">
-          <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-1.5">
-              {cls.name}
-              {sortedDays(cls.days_of_week).map((day) => (
-                <Badge key={day} variant="outline">
-                  {DAY_LABELS[day]}
-                </Badge>
-              ))}
-              {!cls.is_active && (
-                <Badge variant="secondary">Inativa</Badge>
-              )}
-            </CardTitle>
-            <CardAction>
-              <div className="flex gap-1">
+          <CardContent className="flex flex-col gap-3 py-5 px-5">
+            {/* Name + Actions */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-2">
+                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                  {cls.name}
+                </h3>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {sortedDays(cls.days_of_week).map((day) => (
+                    <Badge key={day} variant="outline">
+                      {DAY_LABELS[day]}
+                    </Badge>
+                  ))}
+                  {!cls.is_active && (
+                    <Badge variant="secondary">Inativa</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-1">
                 <Button
                   variant="ghost"
                   size="icon-xs"
@@ -94,23 +96,25 @@ export function ClassesTable({
                   <Trash2Icon />
                 </Button>
               </div>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <MapPinIcon className="size-3.5 shrink-0" />
-              <Badge variant="secondary">{cls.location.name}</Badge>
             </div>
-            <div className="flex items-center gap-2">
-              <ClockIcon className="size-3.5 shrink-0" />
-              <span>
-                {formatTime(cls.start_time)} – {formatTime(cls.end_time)}
-              </span>
-              {cls.max_students && (
-                <span className="text-muted-foreground/60">
-                  (máx. {cls.max_students} alunas)
+
+            {/* Details */}
+            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <MapPinIcon className="size-3.5 shrink-0" />
+                <Badge variant="secondary">{cls.location.name}</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <ClockIcon className="size-3.5 shrink-0" />
+                <span>
+                  {formatTime(cls.start_time)} – {formatTime(cls.end_time)}
                 </span>
-              )}
+                {cls.max_students && (
+                  <span className="text-muted-foreground/60">
+                    (max. {cls.max_students} alunas)
+                  </span>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

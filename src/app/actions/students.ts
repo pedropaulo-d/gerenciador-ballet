@@ -93,11 +93,15 @@ export async function getStudentsPaginated(
     }
 
     // Search across multiple fields
+    // Sanitize: remove PostgREST operator chars to prevent filter injection
     if (search && search.trim()) {
-      const term = `%${search.trim()}%`;
-      query = query.or(
-        `full_name.ilike.${term},guardian_name.ilike.${term},guardian_phone.ilike.${term},guardian_cpf.ilike.${term}`
-      );
+      const sanitized = search.trim().replace(/[,.()"\\]/g, "");
+      if (sanitized) {
+        const term = `%${sanitized}%`;
+        query = query.or(
+          `full_name.ilike.${term},guardian_name.ilike.${term},guardian_phone.ilike.${term},guardian_cpf.ilike.${term}`
+        );
+      }
     }
 
     // Paginate

@@ -46,21 +46,28 @@ export default function DashboardLayout({
   const isMoreActive = moreItems.some((item) => pathname.startsWith(item.href));
 
   return (
-    <div className="flex min-h-dvh flex-col pb-14">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex h-14 max-w-3xl items-center px-4">
-          <Link href="/" className="font-heading text-lg font-semibold tracking-tight">
-            Petit Allegro
+    <div className="flex min-h-dvh flex-col pb-16">
+      {/* ─── Header with gold accent line ─── */}
+      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="mx-auto flex h-16 max-w-3xl items-center px-5">
+          <Link href="/" className="group flex items-baseline gap-2">
+            <span className="font-heading text-2xl font-bold tracking-tight text-foreground text-shadow-gold">
+              Petit Allegro
+            </span>
           </Link>
         </div>
+        {/* Gold accent line — teatro balcony rail */}
+        <div className="h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-4">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-5 py-6">
         {children}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-around">
+      {/* ─── Bottom navigation ─── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="h-px bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
+        <div className="mx-auto flex h-15 max-w-3xl items-center justify-around">
           {navItems.map((item) => {
             const isActive = item.exact
               ? pathname === item.href
@@ -70,40 +77,39 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors",
+                  "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors",
                   isActive
-                    ? "text-foreground"
+                    ? "text-gold"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <item.icon className="size-5" />
-                <span>{item.label}</span>
+                <span className={cn(isActive && "font-semibold")}>{item.label}</span>
               </Link>
             );
           })}
 
-          {/* Botão "Mais" */}
           <button
             type="button"
             onClick={() => setMoreOpen(true)}
             className={cn(
-              "flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors",
+              "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors",
               isMoreActive
-                ? "text-foreground"
+                ? "text-gold"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
             <EllipsisIcon className="size-5" />
-            <span>Mais</span>
+            <span className={cn(isMoreActive && "font-semibold")}>Mais</span>
           </button>
         </div>
       </nav>
 
-      {/* Sheet do menu "Mais" */}
+      {/* ─── Sheet "Mais" ─── */}
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
         <SheetContent side="bottom" showCloseButton={false}>
           <SheetHeader>
-            <SheetTitle>Menu</SheetTitle>
+            <SheetTitle className="text-shadow-gold">Menu</SheetTitle>
           </SheetHeader>
           <div className="flex flex-col gap-1 px-4 pb-4">
             {moreItems.map((item) => {
@@ -113,9 +119,9 @@ export default function DashboardLayout({
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors",
+                      "flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors",
                       isActive
-                        ? "bg-accent text-accent-foreground font-medium"
+                        ? "bg-gold-light/30 text-gold font-medium"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
                   >

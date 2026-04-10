@@ -9,7 +9,7 @@ import {
   type ImportRowResult,
 } from "@/app/actions/import-students";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   UploadIcon,
@@ -69,28 +69,29 @@ export function ImportTool() {
         );
       }
     } catch {
-      toast.error("Erro inesperado na importação.");
+      toast.error("Erro inesperado na importacao.");
     } finally {
       setImporting(false);
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-heading text-xl font-semibold">
-          Importar Alunas (CSV)
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-shadow-gold">
+          Importar Alunas
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="mt-1 text-sm text-muted-foreground">
           Ferramenta para importar alunas via arquivo CSV.
         </p>
       </div>
 
+      {/* Step 1 */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">1. Selecionar arquivo</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-4 py-5 px-5">
+          <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+            1. Selecionar arquivo
+          </h2>
           <input
             ref={fileInputRef}
             type="file"
@@ -110,15 +111,16 @@ export function ImportTool() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileSpreadsheetIcon className="size-4" />
               <span>
-                {csvRows.length} linhas prontas para importação
+                {csvRows.length} linhas prontas para importacao
               </span>
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Step 2: Import button */}
       {csvRows && !result && (
-        <Button onClick={handleImport} disabled={importing}>
+        <Button onClick={handleImport} disabled={importing} size="lg" className="w-full">
           {importing ? (
             <>
               <LoaderIcon className="size-4 animate-spin" />
@@ -130,14 +132,14 @@ export function ImportTool() {
         </Button>
       )}
 
+      {/* Results */}
       {result && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              Resultado da Importação
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+          <CardContent className="flex flex-col gap-4 py-5 px-5">
+            <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+              2. Resultado da Importacao
+            </h2>
+
             <div className="flex gap-3 text-sm">
               <Badge variant="secondary">Total: {result.total}</Badge>
               <Badge variant="default">
@@ -152,16 +154,21 @@ export function ImportTool() {
               {result.results.map((row: ImportRowResult) => (
                 <div
                   key={row.row}
-                  className="flex items-start gap-2 text-sm py-1 border-b last:border-0"
+                  className="flex items-start gap-2 py-2 border-b last:border-0"
                 >
                   {row.success ? (
                     <CheckCircle2Icon className="size-4 shrink-0 text-green-600 mt-0.5" />
                   ) : (
                     <XCircleIcon className="size-4 shrink-0 text-red-500 mt-0.5" />
                   )}
-                  <div className="flex flex-col">
-                    <span>
-                      <strong>#{row.row}</strong> {row.studentName}
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm">
+                      <span className="font-heading text-base font-bold tracking-tight text-foreground">
+                        {row.studentName}
+                      </span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        #{row.row}
+                      </span>
                     </span>
                     {row.error && (
                       <span className="text-xs text-red-500">{row.error}</span>
