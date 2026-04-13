@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-heading);
+
   --color-gold: var(--gold);
   --color-gold-light: var(--gold-light);
   --color-gold-muted: var(--gold-muted);
@@ -176,5 +176,8 @@
   }
   .text-shadow-gold-lg {
     text-shadow: 0 1px 3px oklch(0.745 0.13 80 / 0.45), 0 0 12px oklch(0.745 0.13 80 / 0.1);
+  }
+  .nums {
+    font-variant-numeric: tabular-nums lining-nums;
   }
 }

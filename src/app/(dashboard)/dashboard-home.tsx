@@ -53,7 +53,7 @@ export function DashboardHome() {
   return (
     <div className="flex flex-col gap-10">
       <div>
-        <h1 className="font-heading text-5xl font-bold tracking-tight text-shadow-gold-lg">
+        <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-shadow-gold-lg">
           Dashboard
         </h1>
         <p className="mt-2 text-sm text-muted-foreground capitalize">

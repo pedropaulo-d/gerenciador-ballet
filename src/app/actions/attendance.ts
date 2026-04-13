@@ -1,10 +1,23 @@
 "use server";
 
+import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
 import type { AttendanceRow, AttendanceStatus } from "@/types/database";
+
+// ---------- Validation ----------
+
+const uuidSchema = z.string().uuid();
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de data invalido.");
+const attendanceStatusSchema = z.enum(["present", "absent", "justified"]);
+
+const attendanceRecordSchema = z.object({
+  enrollmentId: uuidSchema,
+  status: attendanceStatusSchema,
+  justification: z.string().max(500).nullish(),
+});
 
 // ---------- Query row shapes ----------
 
@@ -32,6 +45,11 @@ export async function getAttendanceByClassAndDate(
   date: string
 ): Promise<ActionResult<AttendanceRow[]>> {
   try {
+    const parsedId = uuidSchema.safeParse(classId);
+    const parsedDate = dateSchema.safeParse(date);
+    if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
+    if (!parsedDate.success) return { success: false, error: "Data invalida." };
+
     // 1. Get active enrollments for this class with student name
     const { data: enrollments, error: enrollError } = await supabase
       .from("enrollments")
@@ -94,6 +112,15 @@ export async function saveAttendance(
   removals: string[] = []
 ): Promise<ActionResult> {
   try {
+    const parsedDate = dateSchema.safeParse(date);
+    if (!parsedDate.success) return { success: false, error: "Data invalida." };
+
+    const parsedRecords = z.array(attendanceRecordSchema).safeParse(records);
+    if (!parsedRecords.success) return { success: false, error: "Registros de chamada invalidos." };
+
+    const parsedRemovals = z.array(uuidSchema).safeParse(removals);
+    if (!parsedRemovals.success) return { success: false, error: "IDs de remocao invalidos." };
+
     if (records.length === 0 && removals.length === 0) {
       return { success: false, error: "Nenhum registro para salvar." };
     }

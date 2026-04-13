@@ -29,7 +29,7 @@ function formatPhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
-function formatBirthDate(date: string): string {
+function formatDateBR(date: string): string {
   const [y, m, d] = date.split("-");
   return `${d}/${m}/${y}`;
 }
@@ -88,20 +88,20 @@ export function StudentProfileSheet({
               )}
             </SheetHeader>
 
-            <div className="flex flex-col gap-4 px-4 pb-4">
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
               {/* Birth date */}
               {data.student.birthDate && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CalendarIcon className="size-3.5" />
-                  <span>Nascimento: {formatBirthDate(data.student.birthDate)}</span>
+                  <span>Nascimento: <span className="nums font-medium">{formatDateBR(data.student.birthDate)}</span></span>
                 </div>
               )}
 
               {/* Financial */}
               <Card size="sm">
-                <CardContent className="flex items-center justify-between py-3">
+                <CardContent className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm font-medium">Financeiro do mes</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {fStatus ? (
                       <Badge variant={fStatus.variant}>{fStatus.label}</Badge>
                     ) : (
@@ -119,21 +119,55 @@ export function StudentProfileSheet({
                 <CardContent className="py-3">
                   <p className="mb-2 text-sm font-medium">Frequencia do mes</p>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="flex items-center gap-1 text-green-600">
+                    <span className="flex items-center gap-1 text-green-700">
                       <CheckCircle2Icon className="size-3.5" />
-                      {data.attendance.present} P
+                      <span className="text-base font-semibold nums">{data.attendance.present}</span> P
                     </span>
-                    <span className="flex items-center gap-1 text-red-600">
+                    <span className="flex items-center gap-1 text-red-700">
                       <XCircleIcon className="size-3.5" />
-                      {data.attendance.absent} F
+                      <span className="text-base font-semibold nums">{data.attendance.absent}</span> F
                     </span>
-                    <span className="flex items-center gap-1 text-yellow-600">
+                    <span className="flex items-center gap-1 text-yellow-700">
                       <AlertTriangleIcon className="size-3.5" />
-                      {data.attendance.justified} J
+                      <span className="text-base font-semibold nums">{data.attendance.justified}</span> J
                     </span>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Absence history */}
+              {data.absenceHistory.length > 0 && (
+                <Card size="sm">
+                  <CardContent className="flex flex-col gap-3 py-3">
+                    <p className="text-sm font-semibold tracking-tight">
+                      Historico de Faltas
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {data.absenceHistory.map((record) => (
+                        <div
+                          key={record.date}
+                          className="flex items-start gap-2 text-sm"
+                        >
+                          <span className="shrink-0 w-[4.5rem] nums font-medium text-muted-foreground">
+                            {formatDateBR(record.date)}
+                          </span>
+                          <Badge
+                            variant={record.status === "justified" ? "warning" : "destructive"}
+                            className="shrink-0"
+                          >
+                            {record.status === "justified" ? "J" : "F"}
+                          </Badge>
+                          {record.justification && (
+                            <span className="text-muted-foreground">
+                              {record.justification}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Observations */}
               {(data.student.medicalNotes || data.student.internalObservations) && (
@@ -165,21 +199,21 @@ export function StudentProfileSheet({
                     <span>{data.student.guardianName}</span>
                   </div>
                   {data.student.guardianPhone && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <a
                         href={`tel:${data.student.guardianPhone}`}
-                        className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-sm transition-colors hover:bg-muted/80"
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-muted px-3 py-2 text-sm nums font-semibold transition-colors hover:bg-muted/80"
                       >
-                        <PhoneIcon className="size-3.5" />
+                        <PhoneIcon className="size-3.5 shrink-0" />
                         {data.student.guardianPhone}
                       </a>
                       <a
                         href={`https://wa.me/55${formatPhone(data.student.guardianPhone)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-green-700"
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm text-white transition-colors hover:bg-green-700"
                       >
-                        <MessageCircleIcon className="size-3.5" />
+                        <MessageCircleIcon className="size-3.5 shrink-0" />
                         WhatsApp
                       </a>
                     </div>

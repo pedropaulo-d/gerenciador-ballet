@@ -70,7 +70,7 @@ export function StudentFilters({
         </Button>
       </form>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Select value={locationId} onValueChange={onLocationChange}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Local" />

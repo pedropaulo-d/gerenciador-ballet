@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
   // --- 3. Find the monthly_fee by asaas_payment_id ---
   const { data: fee, error: findError } = await supabase
     .from("monthly_fees")
-    .select("id, gross_amount, location_fee")
+    .select("id, status, gross_amount, location_fee")
     .eq("asaas_payment_id", payment.id)
     .maybeSingle();
 
@@ -97,12 +97,20 @@ export async function POST(request: NextRequest) {
   switch (event) {
     case "PAYMENT_RECEIVED":
     case "PAYMENT_CONFIRMED": {
+      // Idempotency: skip if already paid (Asaas may retry)
+      if (fee.status === "paid") {
+        return NextResponse.json({ status: "already_processed" });
+      }
+
       const asaasFee = Math.max(0, payment.value - payment.netValue);
 
+      // Update gross_amount from payment.value to reflect the actual charged
+      // amount (may differ from original due to Asaas discounts/fines).
       const { error: updateError } = await supabase
         .from("monthly_fees")
         .update({
           status: "paid",
+          gross_amount: payment.value,
           asaas_fee: asaasFee,
           paid_at: payment.confirmedDate ?? new Date().toISOString(),
         })
@@ -116,6 +124,10 @@ export async function POST(request: NextRequest) {
     }
 
     case "PAYMENT_OVERDUE": {
+      // Idempotency: skip if already overdue or already paid
+      if (fee.status === "overdue" || fee.status === "paid") {
+        return NextResponse.json({ status: "already_processed" });
+      }
       await supabase
         .from("monthly_fees")
         .update({ status: "overdue" })
@@ -125,6 +137,9 @@ export async function POST(request: NextRequest) {
 
     case "PAYMENT_DELETED":
     case "PAYMENT_REFUNDED": {
+      if (fee.status === "cancelled") {
+        return NextResponse.json({ status: "already_processed" });
+      }
       await supabase
         .from("monthly_fees")
         .update({ status: "cancelled" })

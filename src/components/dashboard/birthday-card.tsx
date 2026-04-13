@@ -21,7 +21,7 @@ export function BirthdayCard({ students }: BirthdayCardProps) {
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15">
             <CakeIcon className="size-5 text-primary" />
           </div>
-          <p className="font-heading text-2xl font-bold tracking-tight text-foreground">
+          <p className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
             {students.length === 1
               ? "Aniversariante do dia!"
               : `${students.length} aniversariantes hoje!`}
@@ -29,10 +29,10 @@ export function BirthdayCard({ students }: BirthdayCardProps) {
         </div>
 
         {/* Names — protagonistas */}
-        <div className="flex flex-col gap-3 pl-13">
+        <div className="flex flex-col gap-3 pl-2 sm:pl-13">
           {students.map((s) => (
-            <div key={s.id} className="flex flex-col">
-              <p className="font-heading text-2xl font-bold tracking-tight text-foreground text-shadow-gold">
+            <div key={s.id} className="flex flex-col min-w-0">
+              <p className="truncate text-xl sm:text-2xl font-bold tracking-tight text-foreground text-shadow-gold">
                 {s.fullName}
               </p>
               {s.className && (

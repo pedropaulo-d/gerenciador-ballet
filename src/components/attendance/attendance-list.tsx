@@ -80,7 +80,7 @@ export function AttendanceList({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        {filledCount} de {totalCount} registradas
+        <span className="nums font-semibold">{filledCount}</span> de <span className="nums font-semibold">{totalCount}</span> registradas
       </p>
 
       {rows.map((row) => {
@@ -92,7 +92,7 @@ export function AttendanceList({
             <CardContent className="flex flex-col gap-3 py-4 px-5">
               <div className="flex items-center justify-between gap-3">
                 {/* The star: student name */}
-                <h3 className="min-w-0 flex-1 truncate font-heading text-xl font-bold tracking-tight text-foreground">
+                <h3 className="min-w-0 flex-1 truncate text-base sm:text-xl font-bold tracking-tight text-foreground">
                   {row.studentName}
                 </h3>
                 {/* Status buttons */}

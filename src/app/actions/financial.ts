@@ -1,11 +1,21 @@
 "use server";
 
+import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
 import type { MonthlyFeeWithDetails } from "@/types/database";
 import { nowBrasilia } from "@/lib/formatters";
+
+// ---------- Validation Schemas ----------
+
+const uuidSchema = z.string().uuid();
+const referenceMonthSchema = z.string().regex(/^\d{4}-\d{2}-01$/, "Formato invalido. Use YYYY-MM-01.");
+const positiveAmount = z.number().positive().max(99_999_999.99);
+const pageSchema = z.number().int().min(1).max(10_000);
+const pageSizeSchema = z.number().int().min(1).max(100);
+const statusSchema = z.enum(["pending", "paid", "overdue", "cancelled"]);
 
 // ---------- Types ----------
 
@@ -26,23 +36,33 @@ export type FinancialPageData = {
 
 // ---------- Query-specific row shapes ----------
 
-/** Shape returned by markOverdueFees select: "id, enrollment:enrollments(due_day)" */
+// ---------- Supabase join shape helpers ----------
+// PostgREST returns objects for many-to-one joins (FK on source table)
+// and arrays for one-to-many. We handle both defensively.
+
+/** Unwrap a PostgREST join that may be object or array */
+function unwrapJoin<T>(value: T | T[] | null | undefined): T | undefined {
+  if (value == null) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Shape returned by markOverdueFees: "id, enrollment:enrollments(due_day)" */
 type PendingFeeRow = {
   id: string;
-  enrollment: { due_day: number }[];
+  enrollment: { due_day: number } | { due_day: number }[] | null;
 };
 
-/** Shape returned by getFinancialByMonth enrollment pre-filter: "id, class:classes(location_id)" */
+/** Shape returned by enrollment pre-filter: "id, class:classes(location_id)" */
 type EnrollmentFilterRow = {
   id: string;
-  class: { location_id: string }[];
+  class: { location_id: string } | { location_id: string }[] | null;
 };
 
-/** Shape returned by generateFeesForMonth select: "id, base_fee, class:classes(location:locations(fee_per_student))" */
+/** Shape returned by generateFeesForMonth: "id, base_fee, class:classes(location:locations(fee_per_student))" */
 type EnrollmentWithLocationFee = {
   id: string;
   base_fee: number;
-  class: { location: { fee_per_student: number }[] }[];
+  class: { location: { fee_per_student: number } | { fee_per_student: number }[] | null } | { location: { fee_per_student: number } | { fee_per_student: number }[] | null }[] | null;
 };
 
 // ---------- Filter types ----------
@@ -66,6 +86,14 @@ export async function getFinancialByMonth(
   filters?: FinancialFilters
 ): Promise<ActionResult<FinancialPageData>> {
   try {
+    const parsed = referenceMonthSchema.safeParse(referenceMonth);
+    if (!parsed.success) return { success: false, error: "Mes de referencia invalido." };
+    if (!pageSchema.safeParse(page).success) return { success: false, error: "Pagina invalida." };
+    if (!pageSizeSchema.safeParse(pageSize).success) return { success: false, error: "Tamanho de pagina invalido." };
+    if (filters?.status && !statusSchema.safeParse(filters.status).success) return { success: false, error: "Status invalido." };
+    if (filters?.locationId && !uuidSchema.safeParse(filters.locationId).success) return { success: false, error: "ID do local invalido." };
+    if (filters?.classId && !uuidSchema.safeParse(filters.classId).success) return { success: false, error: "ID da turma invalido." };
+
     // Auto-mark overdue fees before fetching
     await markOverdueFees(referenceMonth);
 
@@ -91,7 +119,7 @@ export async function getFinancialByMonth(
       if (enrollRows) {
         const typed = enrollRows as EnrollmentFilterRow[];
         const filtered = filters.locationId
-          ? typed.filter((e) => e.class?.[0]?.location_id === filters.locationId)
+          ? typed.filter((e) => unwrapJoin(e.class)?.location_id === filters.locationId)
           : typed;
         enrollmentIds = filtered.map((e) => e.id);
       } else {
@@ -113,8 +141,8 @@ export async function getFinancialByMonth(
 
     if (enrollmentIds !== null) {
       if (enrollmentIds.length === 0) {
-        // No matching enrollments — return empty
-        const summary = await computeSummary(referenceMonth);
+        // No matching enrollments — return empty with zeroed summary
+        const summary = await computeSummary(referenceMonth, enrollmentIds);
         return { success: true, data: { fees: [], total: 0, summary } };
       }
       query = query.in("enrollment_id", enrollmentIds);
@@ -124,12 +152,13 @@ export async function getFinancialByMonth(
       .order("created_at")
       .range(from, to);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: "Falha ao buscar mensalidades." };
 
     const fees = data as MonthlyFeeWithDetails[];
 
     // Summary uses a separate query for totals (all fees, not just current page)
-    const summary = await computeSummary(referenceMonth);
+    // Pass enrollmentIds so summary respects location/class filters
+    const summary = await computeSummary(referenceMonth, enrollmentIds);
 
     return {
       success: true,
@@ -162,7 +191,7 @@ async function markOverdueFees(referenceMonth: string): Promise<void> {
 
   const overdueIds: string[] = [];
   for (const fee of pendingFees as PendingFeeRow[]) {
-    const dueDay = fee.enrollment?.[0]?.due_day ?? 5;
+    const dueDay = unwrapJoin(fee.enrollment)?.due_day ?? 5;
     const dueDate = new Date(year, month - 1, dueDay, 23, 59, 59);
     if (now > dueDate) {
       overdueIds.push(fee.id);
@@ -178,13 +207,27 @@ async function markOverdueFees(referenceMonth: string): Promise<void> {
 }
 
 /**
- * Compute summary for all fees in a month (not paginated).
+ * Compute summary for fees in a month (not paginated).
+ * When enrollmentIds is provided, only those fees are included —
+ * this ensures KPIs recalculate when filtering by location or class.
  */
-async function computeSummary(referenceMonth: string): Promise<FinancialSummary> {
-  const { data } = await supabase
+async function computeSummary(
+  referenceMonth: string,
+  enrollmentIds: string[] | null = null,
+): Promise<FinancialSummary> {
+  let query = supabase
     .from("monthly_fees")
     .select("status, gross_amount, location_fee, net_amount")
     .eq("reference_month", referenceMonth);
+
+  if (enrollmentIds !== null) {
+    if (enrollmentIds.length === 0) {
+      return { totalGrossReceived: 0, totalLocationFees: 0, totalPending: 0, totalOverdue: 0, feesCount: 0, paidCount: 0 };
+    }
+    query = query.in("enrollment_id", enrollmentIds);
+  }
+
+  const { data } = await query;
 
   const summary: FinancialSummary = {
     totalGrossReceived: 0,
@@ -222,13 +265,16 @@ export async function generateFeesForMonth(
   referenceMonth: string
 ): Promise<ActionResult<{ created: number; skipped: number }>> {
   try {
+    const parsed = referenceMonthSchema.safeParse(referenceMonth);
+    if (!parsed.success) return { success: false, error: "Mes de referencia invalido." };
+
     // Fetch active enrollments with location fee data
     const { data: enrollments, error: enrollError } = await supabase
       .from("enrollments")
       .select("id, base_fee, class:classes(location:locations(fee_per_student))")
       .eq("status", "active");
 
-    if (enrollError) return { success: false, error: enrollError.message };
+    if (enrollError) return { success: false, error: "Falha ao buscar matriculas ativas." };
     if (!enrollments || enrollments.length === 0) {
       return { success: true, data: { created: 0, skipped: 0 } };
     }
@@ -255,8 +301,8 @@ export async function generateFeesForMonth(
     for (const enrollment of enrollments as EnrollmentWithLocationFee[]) {
       if (existingIds.has(enrollment.id)) continue;
 
-      const locationFee =
-        enrollment.class?.[0]?.location?.[0]?.fee_per_student ?? 0;
+      const cls = unwrapJoin(enrollment.class);
+      const locationFee = unwrapJoin(cls?.location)?.fee_per_student ?? 0;
 
       toInsert.push({
         enrollment_id: enrollment.id,
@@ -273,7 +319,7 @@ export async function generateFeesForMonth(
         .from("monthly_fees")
         .insert(toInsert);
 
-      if (insertError) return { success: false, error: insertError.message };
+      if (insertError) return { success: false, error: "Falha ao inserir mensalidades." };
     }
 
     return {
@@ -295,6 +341,9 @@ export async function undoPayment(
   feeId: string
 ): Promise<ActionResult> {
   try {
+    const parsedId = uuidSchema.safeParse(feeId);
+    if (!parsedId.success) return { success: false, error: "ID da mensalidade invalido." };
+
     // Fetch enrollment base_fee to restore the original gross_amount
     const { data: fee, error: fetchError } = await supabase
       .from("monthly_fees")
@@ -306,10 +355,13 @@ export async function undoPayment(
       return { success: false, error: "Mensalidade nao encontrada." };
     }
 
-    const baseFee = Number(
-      (fee.enrollment as unknown as { base_fee: number }[])?.[0]?.base_fee ?? 0
+    const enrollment = unwrapJoin(
+      fee.enrollment as unknown as { base_fee: number } | { base_fee: number }[] | null
     );
+    const baseFee = Number(enrollment?.base_fee ?? 0);
 
+    // Reset payment fields but PRESERVE location_fee (set at generation time).
+    // Zeroing location_fee would corrupt net_amount on subsequent payments.
     const { error } = await supabase
       .from("monthly_fees")
       .update({
@@ -317,11 +369,10 @@ export async function undoPayment(
         gross_amount: baseFee,
         paid_at: null,
         asaas_fee: 0,
-        location_fee: 0,
       })
       .eq("id", feeId);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: "Falha ao desfazer pagamento." };
     return { success: true, data: null };
   } catch {
     return { success: false, error: "Falha ao desfazer pagamento." };
@@ -338,16 +389,14 @@ export async function payFeeManually(
   receivedAmount: number
 ): Promise<ActionResult> {
   try {
-    if (!Number.isFinite(receivedAmount) || receivedAmount <= 0) {
-      return { success: false, error: "O valor recebido deve ser maior que zero." };
-    }
+    const parsedId = uuidSchema.safeParse(feeId);
+    if (!parsedId.success) return { success: false, error: "ID da mensalidade invalido." };
+
+    const parsedAmount = positiveAmount.safeParse(receivedAmount);
+    if (!parsedAmount.success) return { success: false, error: "O valor recebido deve ser maior que zero." };
 
     // Clamp to 2 decimal places to match numeric(10,2) in the database
     const sanitized = Math.round(receivedAmount * 100) / 100;
-
-    if (sanitized > 99_999_999.99) {
-      return { success: false, error: "Valor excede o limite permitido." };
-    }
 
     const { error } = await supabase
       .from("monthly_fees")
@@ -359,7 +408,7 @@ export async function payFeeManually(
       })
       .eq("id", feeId);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: "Falha ao registrar pagamento." };
     return { success: true, data: null };
   } catch {
     return { success: false, error: "Falha ao registrar pagamento." };

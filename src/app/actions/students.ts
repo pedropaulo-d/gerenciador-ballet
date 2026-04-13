@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -11,6 +12,32 @@ import type {
   StudentWithEnrollments,
   EnrollmentInsert,
 } from "@/types/database";
+
+// ---------- Validation ----------
+
+const uuidSchema = z.string().uuid();
+
+const studentInsertSchema = z.object({
+  full_name: z.string().trim().min(1, "Nome obrigatorio.").max(200),
+  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  guardian_name: z.string().trim().min(1, "Nome do responsavel obrigatorio.").max(200),
+  guardian_phone: z.string().max(30).nullish(),
+  guardian_email: z.string().email().max(200).nullish().or(z.literal("")).transform(v => v || null),
+  guardian_cpf: z.string().max(20).nullish(),
+  is_internal: z.boolean(),
+  notes: z.string().max(2000).nullish(),
+  is_active: z.boolean(),
+});
+
+const enrollmentInsertSchema = z.object({
+  class_id: uuidSchema,
+  status: z.enum(["active", "inactive", "pending"]),
+  validity_type: z.enum(["semester", "annual"]),
+  starts_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  ends_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  base_fee: z.number().nonnegative().max(99_999_999.99),
+  due_day: z.union([z.literal(5), z.literal(7)]),
+});
 
 // ---------- Paginated list with filters ----------
 
@@ -130,6 +157,12 @@ export async function createStudentWithEnrollment(
   enrollmentPayload: Omit<EnrollmentInsert, "student_id">
 ): Promise<ActionResult<Student>> {
   try {
+    const parsedStudent = studentInsertSchema.safeParse(studentPayload);
+    if (!parsedStudent.success) return { success: false, error: "Dados da aluna invalidos." };
+
+    const parsedEnrollment = enrollmentInsertSchema.safeParse(enrollmentPayload);
+    if (!parsedEnrollment.success) return { success: false, error: "Dados da matricula invalidos." };
+
     const { data: student, error: studentError } = await supabase
       .from("students")
       .insert(studentPayload)
@@ -161,6 +194,9 @@ export async function updateStudent(
   payload: StudentUpdate
 ): Promise<ActionResult<Student>> {
   try {
+    const parsedId = uuidSchema.safeParse(id);
+    if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
+
     const { data, error } = await supabase
       .from("students")
       .update(payload)
@@ -177,6 +213,9 @@ export async function updateStudent(
 
 export async function deleteStudent(id: string): Promise<ActionResult> {
   try {
+    const parsedId = uuidSchema.safeParse(id);
+    if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
+
     const { error } = await supabase.from("students").delete().eq("id", id);
 
     if (error) return { success: false, error: error.message };

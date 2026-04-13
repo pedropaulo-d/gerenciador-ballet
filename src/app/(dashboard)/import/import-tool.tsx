@@ -78,7 +78,7 @@ export function ImportTool() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold tracking-tight text-shadow-gold">
+        <h1 className="text-2xl font-bold tracking-tight text-shadow-gold">
           Importar Alunas
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -89,7 +89,7 @@ export function ImportTool() {
       {/* Step 1 */}
       <Card>
         <CardContent className="flex flex-col gap-4 py-5 px-5">
-          <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">
             1. Selecionar arquivo
           </h2>
           <input
@@ -136,7 +136,7 @@ export function ImportTool() {
       {result && (
         <Card>
           <CardContent className="flex flex-col gap-4 py-5 px-5">
-            <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">
               2. Resultado da Importacao
             </h2>
 
@@ -163,7 +163,7 @@ export function ImportTool() {
                   )}
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm">
-                      <span className="font-heading text-base font-bold tracking-tight text-foreground">
+                      <span className="text-base font-bold tracking-tight text-foreground">
                         {row.studentName}
                       </span>
                       <span className="ml-2 text-xs text-muted-foreground">

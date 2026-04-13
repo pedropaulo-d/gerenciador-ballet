@@ -87,7 +87,7 @@ export function StudentsTable({
                     className="text-left"
                     onClick={() => onViewProfile(student)}
                   >
-                    <h3 className="font-heading text-xl font-bold tracking-tight text-foreground hover:text-primary transition-colors">
+                    <h3 className="truncate text-lg sm:text-xl font-bold tracking-tight text-foreground hover:text-primary transition-colors">
                       {student.full_name}
                     </h3>
                   </button>
@@ -130,25 +130,25 @@ export function StudentsTable({
               {/* Supporting details */}
               <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
                 {student.guardian_phone ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <PhoneIcon className="size-3.5 shrink-0" />
-                    <span>
+                    <span className="truncate">
                       {student.guardian_name} · {student.guardian_phone}
                     </span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <UsersIcon className="size-3.5 shrink-0" />
-                    <span>Resp: {student.guardian_name}</span>
+                    <span className="truncate">Resp: {student.guardian_name}</span>
                   </div>
                 )}
                 {activeEnrollments.length > 0 ? (
                   activeEnrollments.map((enrollment) => (
-                    <div key={enrollment.id} className="flex items-center gap-2">
+                    <div key={enrollment.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <GraduationCapIcon className="size-3.5 shrink-0" />
-                      <span>{enrollment.class.name}</span>
+                      <span className="truncate max-w-[10rem] sm:max-w-none">{enrollment.class.name}</span>
                       <MapPinIcon className="size-3 shrink-0" />
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="truncate max-w-[8rem] sm:max-w-none">
                         {enrollment.class.location.name}
                       </Badge>
                       <Badge variant="outline">

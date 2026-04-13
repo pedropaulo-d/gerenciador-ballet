@@ -59,7 +59,7 @@ export function LocationsTable({
             {/* Name + Actions */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                <h3 className="truncate text-lg sm:text-xl font-bold tracking-tight text-foreground">
                   {location.name}
                 </h3>
                 {!location.is_active && (
@@ -87,9 +87,9 @@ export function LocationsTable({
             {/* Details */}
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
               {location.address && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <MapPinIcon className="size-3.5 shrink-0" />
-                  <span>{location.address}</span>
+                  <span className="truncate">{location.address}</span>
                 </div>
               )}
               <div className="flex items-center gap-2">

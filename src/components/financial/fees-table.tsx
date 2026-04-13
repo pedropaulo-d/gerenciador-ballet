@@ -78,34 +78,34 @@ export function FeesTable({ fees, loading, onPayManually, onUndoPayment }: FeesT
             <CardContent className="flex flex-col gap-3 py-5 px-5">
               {/* The star: student name + status badge */}
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                <h3 className="min-w-0 truncate text-lg sm:text-xl font-bold tracking-tight text-foreground">
                   {student?.full_name ?? "\u2014"}
                 </h3>
                 <Badge variant={variant} className="shrink-0 mt-1">{label}</Badge>
               </div>
 
-              {/* Amount + details */}
-              <p className="font-heading text-2xl font-bold text-foreground">
+              {/* Amount */}
+              <p className="text-xl md:text-2xl font-semibold nums tracking-tight text-foreground">
                 {formatCurrency(Number(fee.gross_amount))}
               </p>
 
               {/* Supporting details */}
               <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <GraduationCapIcon className="size-3.5 shrink-0" />
-                  <span>{cls?.name ?? "\u2014"}</span>
+                  <span className="truncate max-w-[10rem] sm:max-w-none">{cls?.name ?? "\u2014"}</span>
                   <MapPinIcon className="size-3 shrink-0" />
-                  <Badge variant="secondary">{cls?.location?.name ?? "\u2014"}</Badge>
+                  <Badge variant="secondary" className="truncate max-w-[8rem] sm:max-w-none">{cls?.location?.name ?? "\u2014"}</Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   {fee.status === "paid" && (
                     <>
-                      <span>Asaas: -{formatCurrency(Number(fee.asaas_fee))}</span>
-                      <span>Local: -{formatCurrency(Number(fee.location_fee))}</span>
-                      <span>Liquido: {formatCurrency(Number(fee.net_amount))}</span>
+                      <span>Asaas: <span className="nums font-medium">-{formatCurrency(Number(fee.asaas_fee))}</span></span>
+                      <span>Local: <span className="nums font-medium">-{formatCurrency(Number(fee.location_fee))}</span></span>
+                      <span>Liquido: <span className="nums font-semibold">{formatCurrency(Number(fee.net_amount))}</span></span>
                     </>
                   )}
-                  <span>Venc: dia {String(fee.enrollment?.due_day ?? "\u2014").padStart(2, "0")}</span>
+                  <span className="text-foreground/70">Venc: dia <span className="nums font-semibold">{String(fee.enrollment?.due_day ?? "\u2014").padStart(2, "0")}</span></span>
                 </div>
               </div>
 

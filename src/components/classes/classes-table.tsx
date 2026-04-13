@@ -66,7 +66,7 @@ export function ClassesTable({
             {/* Name + Actions */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-col gap-2">
-                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                <h3 className="truncate text-lg sm:text-xl font-bold tracking-tight text-foreground">
                   {cls.name}
                 </h3>
                 <div className="flex flex-wrap items-center gap-1.5">

@@ -1,19 +1,12 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
+import { Roboto } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const headingFont = Cormorant_Garamond({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-const bodyFont = Plus_Jakarta_Sans({
+const roboto = Roboto({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "700"],
   display: "swap",
 });
 
@@ -30,7 +23,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${headingFont.variable} ${bodyFont.variable} h-full antialiased`}
+      className={`${roboto.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

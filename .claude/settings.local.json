@@ -4,7 +4,9 @@
       "Bash(npx shadcn@latest add table button input label dialog select card separator badge --yes)",
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(npx next:*)"
     ]
   }
 }

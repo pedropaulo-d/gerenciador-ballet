@@ -11,7 +11,7 @@ interface FinancialSummaryProps {
 
 export function FinancialSummary({ summary }: FinancialSummaryProps) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
       <Card size="sm">
         <CardHeader className="pb-1">
           <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -20,15 +20,15 @@ export function FinancialSummary({ summary }: FinancialSummaryProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm font-semibold text-green-600">
+          <p className="text-sm font-semibold nums text-green-700">
             {formatCurrency(summary.totalGrossReceived)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {summary.paidCount} de {summary.feesCount}
+            <span className="nums font-medium">{summary.paidCount}</span> de <span className="nums font-medium">{summary.feesCount}</span>
           </p>
           {summary.totalLocationFees > 0 && (
             <p className="text-xs text-muted-foreground">
-              Repasses: {formatCurrency(summary.totalLocationFees)}
+              Repasses: <span className="nums font-medium">{formatCurrency(summary.totalLocationFees)}</span>
             </p>
           )}
         </CardContent>
@@ -42,7 +42,7 @@ export function FinancialSummary({ summary }: FinancialSummaryProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm font-semibold text-yellow-600">
+          <p className="text-sm font-semibold nums text-yellow-700">
             {formatCurrency(summary.totalPending)}
           </p>
         </CardContent>
@@ -56,7 +56,7 @@ export function FinancialSummary({ summary }: FinancialSummaryProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm font-semibold text-red-500">
+          <p className="text-sm font-semibold nums text-red-600">
             {formatCurrency(summary.totalOverdue)}
           </p>
         </CardContent>

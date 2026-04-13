@@ -38,7 +38,7 @@ export function FinancialFilters({
       : classes;
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
       <Select value={status} onValueChange={onStatusChange}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Status" />

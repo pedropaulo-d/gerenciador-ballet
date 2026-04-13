@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -10,6 +11,18 @@ import type {
   ClassUpdate,
   ClassWithLocation,
 } from "@/types/database";
+
+const uuidSchema = z.string().uuid();
+
+const classInsertSchema = z.object({
+  location_id: uuidSchema,
+  name: z.string().trim().min(1, "Nome obrigatorio.").max(200),
+  days_of_week: z.array(z.number().int().min(0).max(6)).min(1),
+  start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  max_students: z.number().int().positive().nullish(),
+  is_active: z.boolean(),
+});
 
 export async function getClassesWithLocation(
   locationId?: string
@@ -38,6 +51,9 @@ export async function createClass(
   payload: ClassInsert
 ): Promise<ActionResult<Class>> {
   try {
+    const parsed = classInsertSchema.safeParse(payload);
+    if (!parsed.success) return { success: false, error: "Dados da turma invalidos." };
+
     const { data, error } = await supabase
       .from("classes")
       .insert(payload)
@@ -56,6 +72,9 @@ export async function updateClass(
   payload: ClassUpdate
 ): Promise<ActionResult<Class>> {
   try {
+    const parsedId = uuidSchema.safeParse(id);
+    if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
+
     const { data, error } = await supabase
       .from("classes")
       .update(payload)
@@ -72,6 +91,9 @@ export async function updateClass(
 
 export async function deleteClass(id: string): Promise<ActionResult> {
   try {
+    const parsedId = uuidSchema.safeParse(id);
+    if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
+
     const { error } = await supabase.from("classes").delete().eq("id", id);
 
     if (error) return { success: false, error: error.message };

@@ -51,7 +51,7 @@ export default function DashboardLayout({
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="mx-auto flex h-16 max-w-3xl items-center px-5">
           <Link href="/" className="group flex items-baseline gap-2">
-            <span className="font-heading text-2xl font-bold tracking-tight text-foreground text-shadow-gold">
+            <span className="text-2xl font-bold tracking-tight text-foreground text-shadow-gold">
               Petit Allegro
             </span>
           </Link>

@@ -27,15 +27,17 @@ export function DashboardMetrics({
   const hasAbsences = !isPending && absencesToday > 0;
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <Link href="/locations">
         <Card className={GOLD_CARD}>
-          <CardContent className="flex flex-col items-center gap-2 py-6 px-3 text-center">
-            <MapPinIcon className="size-5 text-gold" />
-            <p className="font-heading text-lg font-semibold text-foreground">
-              Locais
-            </p>
-            <p className="font-heading text-5xl font-bold leading-none text-foreground">
+          <CardContent className="flex items-center justify-between gap-3 py-4 px-4 sm:flex-col sm:items-center sm:justify-start sm:gap-2 sm:py-6 sm:px-3 sm:text-center">
+            <div className="flex items-center gap-2.5 sm:flex-col sm:gap-2">
+              <MapPinIcon className="size-5 text-gold" />
+              <p className="text-base sm:text-lg font-semibold text-foreground">
+                Locais
+              </p>
+            </div>
+            <p className="text-2xl sm:text-3xl md:text-4xl font-semibold nums leading-none text-foreground">
               {isPending ? "\u2014" : locationsCount}
             </p>
           </CardContent>
@@ -44,12 +46,14 @@ export function DashboardMetrics({
 
       <Link href="/classes">
         <Card className={GOLD_CARD}>
-          <CardContent className="flex flex-col items-center gap-2 py-6 px-3 text-center">
-            <GraduationCapIcon className="size-5 text-gold" />
-            <p className="font-heading text-lg font-semibold text-foreground">
-              Turmas
-            </p>
-            <p className="font-heading text-5xl font-bold leading-none text-foreground">
+          <CardContent className="flex items-center justify-between gap-3 py-4 px-4 sm:flex-col sm:items-center sm:justify-start sm:gap-2 sm:py-6 sm:px-3 sm:text-center">
+            <div className="flex items-center gap-2.5 sm:flex-col sm:gap-2">
+              <GraduationCapIcon className="size-5 text-gold" />
+              <p className="text-base sm:text-lg font-semibold text-foreground">
+                Turmas
+              </p>
+            </div>
+            <p className="text-2xl sm:text-3xl md:text-4xl font-semibold nums leading-none text-foreground">
               {isPending ? "\u2014" : classesCount}
             </p>
           </CardContent>
@@ -64,13 +68,15 @@ export function DashboardMetrics({
               : GOLD_CARD
           }
         >
-          <CardContent className="flex flex-col items-center gap-2 py-6 px-3 text-center">
-            <XCircleIcon className={`size-5 ${hasAbsences ? "text-red-500" : "text-gold"}`} />
-            <p className="font-heading text-lg font-semibold text-foreground">
-              Faltas Hoje
-            </p>
+          <CardContent className="flex items-center justify-between gap-3 py-4 px-4 sm:flex-col sm:items-center sm:justify-start sm:gap-2 sm:py-6 sm:px-3 sm:text-center">
+            <div className="flex items-center gap-2.5 sm:flex-col sm:gap-2">
+              <XCircleIcon className={`size-5 ${hasAbsences ? "text-red-500" : "text-gold"}`} />
+              <p className="text-base sm:text-lg font-semibold text-foreground">
+                Faltas Hoje
+              </p>
+            </div>
             <p
-              className={`font-heading text-5xl font-bold leading-none ${
+              className={`text-2xl sm:text-3xl md:text-4xl font-semibold nums leading-none ${
                 hasAbsences ? "text-red-600" : "text-foreground"
               }`}
             >

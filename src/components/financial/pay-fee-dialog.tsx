@@ -31,12 +31,15 @@ export function PayFeeDialog({
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
 
-  // Reset amount when a new fee is opened
+  // Sync amount when the dialog opens with a (possibly new) fee.
+  // The fee ID in the dependency array ensures this only fires on actual changes.
+  const feeId = fee?.id ?? null;
   useEffect(() => {
     if (fee && open) {
       setAmount(Number(fee.gross_amount).toFixed(2));
     }
-  }, [fee, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feeId, open]);
 
   async function handleConfirm() {
     if (!fee) return;
@@ -57,7 +60,7 @@ export function PayFeeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-heading text-2xl font-bold tracking-tight">
+          <DialogTitle className="text-2xl font-bold tracking-tight">
             Confirmar Recebimento Manual
           </DialogTitle>
           <DialogDescription>
@@ -87,7 +90,7 @@ export function PayFeeDialog({
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="received-amount"
-                className="font-heading text-lg font-semibold tracking-tight"
+                className="text-lg font-semibold tracking-tight"
               >
                 Valor Efetivamente Recebido
               </label>

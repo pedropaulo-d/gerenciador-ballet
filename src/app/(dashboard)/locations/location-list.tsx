@@ -76,7 +76,7 @@ export function LocationList() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold tracking-tight text-shadow-gold">Locais</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-shadow-gold">Locais</h1>
         <Button onClick={openCreate} size="sm">
           <PlusIcon data-icon="inline-start" />
           Novo Local

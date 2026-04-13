@@ -141,17 +141,17 @@ export function StudentList() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold tracking-tight text-shadow-gold">Alunas</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-shadow-gold">Alunas</h1>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm">
             <Link href="/import">
               <UploadIcon className="size-4" />
-              Importar
+              <span className="hidden sm:inline">Importar</span>
             </Link>
           </Button>
           <Button onClick={openCreate} size="sm">
             <PlusIcon data-icon="inline-start" />
-            Nova Aluna
+            <span className="hidden sm:inline">Nova Aluna</span>
           </Button>
         </div>
       </div>

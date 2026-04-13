@@ -1,10 +1,20 @@
 "use server";
 
+import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
 import type { Location, LocationInsert, LocationUpdate } from "@/types/database";
+
+const uuidSchema = z.string().uuid();
+
+const locationInsertSchema = z.object({
+  name: z.string().trim().min(1, "Nome obrigatorio.").max(200),
+  address: z.string().max(500).nullish(),
+  fee_per_student: z.number().nonnegative().max(99_999_999.99),
+  is_active: z.boolean(),
+});
 
 export async function getLocations(): Promise<ActionResult<Location[]>> {
   try {
@@ -24,6 +34,9 @@ export async function createLocation(
   payload: LocationInsert
 ): Promise<ActionResult<Location>> {
   try {
+    const parsed = locationInsertSchema.safeParse(payload);
+    if (!parsed.success) return { success: false, error: "Dados do local invalidos." };
+
     const { data, error } = await supabase
       .from("locations")
       .insert(payload)
@@ -42,6 +55,9 @@ export async function updateLocation(
   payload: LocationUpdate
 ): Promise<ActionResult<Location>> {
   try {
+    const parsedId = uuidSchema.safeParse(id);
+    if (!parsedId.success) return { success: false, error: "ID do local invalido." };
+
     const { data, error } = await supabase
       .from("locations")
       .update(payload)
@@ -60,6 +76,9 @@ export async function deleteLocation(
   id: string
 ): Promise<ActionResult> {
   try {
+    const parsedId = uuidSchema.safeParse(id);
+    if (!parsedId.success) return { success: false, error: "ID do local invalido." };
+
     const { error } = await supabase
       .from("locations")
       .delete()

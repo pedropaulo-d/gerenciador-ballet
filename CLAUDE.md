@@ -69,7 +69,7 @@ supabase/schema.sql            # Script SQL completo (6 tabelas, RLS, triggers, 
 ## Identidade Visual — Tema "Teatro Português"
 
 - **Paleta:** Rosa ballet (primary), ouro envelhecido (--gold), marfim quente (background)
-- **Tipografia:** Playfair Display (headings) + Inter (body)
+- **Tipografia:** Roboto (400/500/700) — fonte unica para todo o sistema
 - **Background:** Damask SVG pattern (opacity 4%)
 - **Cards:** Bordas douradas sutis, sombras quentes
 - **Dark mode:** Definido no CSS mas nao ativado (sem ThemeProvider)

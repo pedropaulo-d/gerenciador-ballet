@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -7,7 +8,16 @@ const supabase = getServiceSupabase();
 import type { AttendanceStatus } from "@/types/database";
 import { getCurrentMonth, getCurrentMonthRange } from "@/lib/formatters";
 
+const uuidSchema = z.string().uuid();
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 // ---------- Return type ----------
+
+export type AbsenceRecord = {
+  date: string;
+  status: "absent" | "justified";
+  justification: string | null;
+};
 
 export type StudentSummary = {
   student: {
@@ -32,6 +42,7 @@ export type StudentSummary = {
     absent: number;
     justified: number;
   };
+  absenceHistory: AbsenceRecord[];
 };
 
 // ---------- Query row shapes ----------
@@ -45,8 +56,10 @@ type FeeStatusRow = {
   status: string;
 };
 
-type AttendanceCountRow = {
+type AttendanceDetailRow = {
+  date: string;
   status: AttendanceStatus;
+  justification: string | null;
 };
 
 // ---------- Action ----------
@@ -55,6 +68,9 @@ export async function getStudentSummary(
   studentId: string
 ): Promise<ActionResult<StudentSummary>> {
   try {
+    const parsedId = uuidSchema.safeParse(studentId);
+    if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
+
     // 1. Student data
     const { data: student, error: studentError } = await supabase
       .from("students")
@@ -87,45 +103,53 @@ export async function getStudentSummary(
         }
       : null;
 
-    // 3. Financial: current month fee status + any overdue in history
+    // 3–5. Financial + Attendance (parallel when enrollment exists)
     const referenceMonth = getCurrentMonth();
+    const { start, end } = getCurrentMonthRange();
     let currentMonthStatus: string | null = null;
     let hasOverdueHistory = false;
-
-    if (enrollmentId) {
-      const { data: currentFees } = await supabase
-        .from("monthly_fees")
-        .select("status")
-        .eq("enrollment_id", enrollmentId)
-        .eq("reference_month", referenceMonth)
-        .limit(1);
-
-      currentMonthStatus = (currentFees as FeeStatusRow[] | null)?.[0]?.status ?? null;
-
-      const { count } = await supabase
-        .from("monthly_fees")
-        .select("id", { count: "exact", head: true })
-        .eq("enrollment_id", enrollmentId)
-        .eq("status", "overdue");
-
-      hasOverdueHistory = (count ?? 0) > 0;
-    }
-
-    // 4. Attendance counts for current month
-    const { start, end } = getCurrentMonthRange();
     const attendanceCounts = { present: 0, absent: 0, justified: 0 };
+    const absenceHistory: AbsenceRecord[] = [];
 
     if (enrollmentId) {
-      const { data: records } = await supabase
-        .from("attendance")
-        .select("status")
-        .eq("enrollment_id", enrollmentId)
-        .gte("date", start)
-        .lte("date", end);
+      const [feeRes, overdueRes, attendanceRes] = await Promise.all([
+        // Current month fee status
+        supabase
+          .from("monthly_fees")
+          .select("status")
+          .eq("enrollment_id", enrollmentId)
+          .eq("reference_month", referenceMonth)
+          .limit(1),
+        // Any overdue fees in history
+        supabase
+          .from("monthly_fees")
+          .select("id", { count: "exact", head: true })
+          .eq("enrollment_id", enrollmentId)
+          .eq("status", "overdue"),
+        // All attendance records (used for both counts and history)
+        supabase
+          .from("attendance")
+          .select("date, status, justification")
+          .eq("enrollment_id", enrollmentId)
+          .order("date", { ascending: false }),
+      ]);
 
-      for (const r of (records ?? []) as AttendanceCountRow[]) {
-        if (r.status in attendanceCounts) {
+      currentMonthStatus = (feeRes.data as FeeStatusRow[] | null)?.[0]?.status ?? null;
+      hasOverdueHistory = (overdueRes.count ?? 0) > 0;
+
+      // Single pass: compute monthly counts + build absence history
+      for (const r of (attendanceRes.data ?? []) as AttendanceDetailRow[]) {
+        if (r.date >= start && r.date <= end && r.status in attendanceCounts) {
           attendanceCounts[r.status]++;
+        }
+        if (r.status === "absent" || r.status === "justified") {
+          if (absenceHistory.length < 20) {
+            absenceHistory.push({
+              date: r.date,
+              status: r.status,
+              justification: r.justification,
+            });
+          }
         }
       }
     }
@@ -148,6 +172,7 @@ export async function getStudentSummary(
           hasOverdueHistory,
         },
         attendance: attendanceCounts,
+        absenceHistory,
       },
     };
   } catch {
@@ -162,6 +187,9 @@ export async function getTodayAbsencesCount(
   date: string
 ): Promise<ActionResult<number>> {
   try {
+    const parsedDate = dateSchema.safeParse(date);
+    if (!parsedDate.success) return { success: false, error: "Data invalida." };
+
     const { count, error } = await supabase
       .from("attendance")
       .select("id", { count: "exact", head: true })
