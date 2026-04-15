@@ -6,7 +6,8 @@
       "Bash(npx eslint:*)",
       "Bash(npm run:*)",
       "Bash(npm install:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(npm ls:*)"
     ]
   }
 }

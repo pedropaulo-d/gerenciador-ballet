@@ -1,6 +1,7 @@
 "use server";
 
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAuth, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 import { nowBrasilia } from "@/lib/formatters";
 
@@ -25,6 +26,8 @@ export async function getTodayBirthdays(): Promise<
   ActionResult<BirthdayStudent[]>
 > {
   try {
+    await requireAuth();
+
     const now = nowBrasilia();
     const day = now.getDate();
     const month = now.getMonth() + 1;
@@ -59,7 +62,7 @@ export async function getTodayBirthdays(): Promise<
       });
 
     return { success: true, data: birthdays };
-  } catch {
-    return { success: false, error: "Falha ao buscar aniversariantes." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao buscar aniversariantes." };
   }
 }

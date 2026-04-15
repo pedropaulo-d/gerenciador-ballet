@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
@@ -28,6 +29,8 @@ export async function getClassesWithLocation(
   locationId?: string
 ): Promise<ActionResult<ClassWithLocation[]>> {
   try {
+    await requireAuth();
+
     let query = supabase
       .from("classes")
       .select("*, location:locations(*)")
@@ -42,8 +45,8 @@ export async function getClassesWithLocation(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as ClassWithLocation[] };
-  } catch {
-    return { success: false, error: "Falha ao buscar turmas." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao buscar turmas." };
   }
 }
 
@@ -51,6 +54,8 @@ export async function createClass(
   payload: ClassInsert
 ): Promise<ActionResult<Class>> {
   try {
+    await requireAdmin();
+
     const parsed = classInsertSchema.safeParse(payload);
     if (!parsed.success) return { success: false, error: "Dados da turma invalidos." };
 
@@ -62,8 +67,8 @@ export async function createClass(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Class };
-  } catch {
-    return { success: false, error: "Falha ao cadastrar turma." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao cadastrar turma." };
   }
 }
 
@@ -72,6 +77,8 @@ export async function updateClass(
   payload: ClassUpdate
 ): Promise<ActionResult<Class>> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
 
@@ -84,13 +91,15 @@ export async function updateClass(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Class };
-  } catch {
-    return { success: false, error: "Falha ao atualizar turma." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao atualizar turma." };
   }
 }
 
 export async function deleteClass(id: string): Promise<ActionResult> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
 
@@ -98,7 +107,7 @@ export async function deleteClass(id: string): Promise<ActionResult> {
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Falha ao excluir turma." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao excluir turma." };
   }
 }

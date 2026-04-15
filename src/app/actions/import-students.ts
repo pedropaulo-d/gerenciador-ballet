@@ -1,6 +1,7 @@
 "use server";
 
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth-guard";
 
 const supabase = getServiceSupabase();
 
@@ -131,6 +132,8 @@ function findClassId(
 export async function importStudentsFromCsv(
   rows: CsvRow[]
 ): Promise<ImportResult> {
+  await requireAdmin();
+
   const results: ImportRowResult[] = [];
   let imported = 0;
   let failed = 0;

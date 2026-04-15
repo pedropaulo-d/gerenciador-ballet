@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
@@ -18,6 +19,8 @@ const locationInsertSchema = z.object({
 
 export async function getLocations(): Promise<ActionResult<Location[]>> {
   try {
+    await requireAdmin();
+
     const { data, error } = await supabase
       .from("locations")
       .select("*")
@@ -25,8 +28,8 @@ export async function getLocations(): Promise<ActionResult<Location[]>> {
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Location[] };
-  } catch {
-    return { success: false, error: "Falha ao buscar locais." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao buscar locais." };
   }
 }
 
@@ -34,6 +37,8 @@ export async function createLocation(
   payload: LocationInsert
 ): Promise<ActionResult<Location>> {
   try {
+    await requireAdmin();
+
     const parsed = locationInsertSchema.safeParse(payload);
     if (!parsed.success) return { success: false, error: "Dados do local invalidos." };
 
@@ -45,8 +50,8 @@ export async function createLocation(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Location };
-  } catch {
-    return { success: false, error: "Falha ao cadastrar local." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao cadastrar local." };
   }
 }
 
@@ -55,6 +60,8 @@ export async function updateLocation(
   payload: LocationUpdate
 ): Promise<ActionResult<Location>> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID do local invalido." };
 
@@ -67,8 +74,8 @@ export async function updateLocation(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Location };
-  } catch {
-    return { success: false, error: "Falha ao atualizar local." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao atualizar local." };
   }
 }
 
@@ -76,6 +83,8 @@ export async function deleteLocation(
   id: string
 ): Promise<ActionResult> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID do local invalido." };
 
@@ -86,7 +95,7 @@ export async function deleteLocation(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Falha ao excluir local." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao excluir local." };
   }
 }

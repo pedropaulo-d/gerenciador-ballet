@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import type { StudentSummary } from "@/app/actions/student-profile";
 import { getStudentSummary } from "@/app/actions/student-profile";
+import { useIsAdmin } from "@/lib/user-role-context";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -65,6 +66,8 @@ export function StudentProfileSheet({
     });
   }, [studentId, open, startTransition]);
 
+  const isAdmin = useIsAdmin();
+
   const fStatus = data?.financial.currentMonthStatus
     ? FINANCIAL_STATUS_MAP[data.financial.currentMonthStatus]
     : null;
@@ -74,6 +77,9 @@ export function StudentProfileSheet({
       <SheetContent side="right">
         {isPending || !data ? (
           <div className="flex h-full items-center justify-center">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Carregando perfil</SheetTitle>
+            </SheetHeader>
             <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
@@ -97,22 +103,24 @@ export function StudentProfileSheet({
                 </div>
               )}
 
-              {/* Financial */}
-              <Card size="sm">
-                <CardContent className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-sm font-medium">Financeiro do mes</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {fStatus ? (
-                      <Badge variant={fStatus.variant}>{fStatus.label}</Badge>
-                    ) : (
-                      <Badge variant="secondary">Sem mensalidade</Badge>
-                    )}
-                    {data.financial.hasOverdueHistory && (
-                      <Badge variant="destructive">Historico devedor</Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Financial — admin only */}
+              {isAdmin && (
+                <Card size="sm">
+                  <CardContent className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-sm font-medium">Financeiro do mes</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {fStatus ? (
+                        <Badge variant={fStatus.variant}>{fStatus.label}</Badge>
+                      ) : (
+                        <Badge variant="secondary">Sem mensalidade</Badge>
+                      )}
+                      {data.financial.hasOverdueHistory && (
+                        <Badge variant="destructive">Historico devedor</Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Attendance */}
               <Card size="sm">

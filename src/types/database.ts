@@ -4,10 +4,21 @@
 
 // ---------- Enums ----------
 
+export type AppRole = 'admin' | 'teacher';
 export type EnrollmentStatus = 'active' | 'inactive' | 'pending';
 export type ValidityType = 'semester' | 'annual';
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
 export type AttendanceStatus = 'present' | 'absent' | 'justified';
+
+// ---------- Auth ----------
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  role: AppRole;
+  created_at: string;
+  updated_at: string;
+}
 
 // ---------- Base ----------
 

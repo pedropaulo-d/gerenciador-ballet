@@ -163,7 +163,44 @@ create index idx_students_guardian_phone_trgm on students using gin (guardian_ph
 create index idx_students_guardian_cpf_trgm   on students using gin (guardian_cpf   gin_trgm_ops);
 
 -- ============================================
--- Row Level Security (placeholder — habilitar após configurar auth)
+-- 7. PROFILES (Extensão de auth.users — RBAC)
+-- ============================================
+
+-- Enum para roles da aplicação
+create type app_role as enum ('admin', 'teacher');
+
+create table profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  full_name  text not null default '',
+  role       app_role not null default 'teacher',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Trigger updated_at
+create trigger trg_profiles_updated_at
+  before update on profiles for each row execute function update_updated_at();
+
+-- Cria profile automaticamente ao inserir usuário no auth.users
+create or replace function handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, full_name, role)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'full_name', ''),
+    'teacher'  -- role padrão por segurança; admin é promovido manualmente
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- ============================================
+-- Row Level Security
 -- ============================================
 alter table locations    enable row level security;
 alter table classes      enable row level security;
@@ -171,6 +208,7 @@ alter table students     enable row level security;
 alter table enrollments  enable row level security;
 alter table monthly_fees enable row level security;
 alter table attendance   enable row level security;
+alter table profiles     enable row level security;
 
 -- Políticas de acesso: apenas usuários autenticados (single-tenant)
 create policy "Allow all for authenticated" on locations    for all to authenticated using (true) with check (true);
@@ -180,5 +218,16 @@ create policy "Allow all for authenticated" on enrollments  for all to authentic
 create policy "Allow all for authenticated" on monthly_fees for all to authenticated using (true) with check (true);
 create policy "Allow all for authenticated" on attendance   for all to authenticated using (true) with check (true);
 
+-- Profiles: usuário pode ler seu próprio perfil; admin pode ler todos
+create policy "Users can read own profile" on profiles
+  for select to authenticated using (id = auth.uid());
+create policy "Admin can read all profiles" on profiles
+  for select to authenticated
+  using (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin'));
+create policy "Admin can update profiles" on profiles
+  for update to authenticated
+  using (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin'));
+
 -- IMPORTANTE: Nenhuma policy para 'anon'. A anon key (pública) não tem acesso.
 -- O webhook Asaas deve usar SUPABASE_SERVICE_ROLE_KEY, que bypassa RLS.
+-- O trigger handle_new_user() usa SECURITY DEFINER para inserir profiles (bypassa RLS).

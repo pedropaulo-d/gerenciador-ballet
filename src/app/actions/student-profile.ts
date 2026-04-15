@@ -2,16 +2,17 @@
 
 import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAuth, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
-
-const supabase = getServiceSupabase();
 import type { AttendanceStatus } from "@/types/database";
 import { getCurrentMonth, getCurrentMonthRange } from "@/lib/formatters";
+
+const supabase = getServiceSupabase();
 
 const uuidSchema = z.string().uuid();
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-// ---------- Return type ----------
+// ---------- Types ----------
 
 export type AbsenceRecord = {
   date: string;
@@ -34,7 +35,7 @@ export type StudentSummary = {
     locationName: string;
   } | null;
   financial: {
-    currentMonthStatus: string | null; // 'paid' | 'pending' | 'overdue' | null
+    currentMonthStatus: string | null;
     hasOverdueHistory: boolean;
   };
   attendance: {
@@ -62,7 +63,29 @@ type AttendanceDetailRow = {
   justification: string | null;
 };
 
-// ---------- Action ----------
+// ---------- Helpers ----------
+
+function processAttendance(
+  rows: AttendanceDetailRow[],
+  monthStart: string,
+  monthEnd: string,
+) {
+  const counts = { present: 0, absent: 0, justified: 0 };
+  const history: AbsenceRecord[] = [];
+
+  for (const r of rows) {
+    if (r.date >= monthStart && r.date <= monthEnd && r.status in counts) {
+      counts[r.status]++;
+    }
+    if ((r.status === "absent" || r.status === "justified") && history.length < 20) {
+      history.push({ date: r.date, status: r.status, justification: r.justification });
+    }
+  }
+
+  return { counts, history };
+}
+
+// ---------- Actions ----------
 
 export async function getStudentSummary(
   studentId: string
@@ -103,54 +126,59 @@ export async function getStudentSummary(
         }
       : null;
 
-    // 3–5. Financial + Attendance (parallel when enrollment exists)
+    // 3. Caller role (determines financial visibility + enforces auth)
+    const { role: callerRole } = await requireAuth();
+
+    // 4. Financial + Attendance
     const referenceMonth = getCurrentMonth();
     const { start, end } = getCurrentMonthRange();
     let currentMonthStatus: string | null = null;
     let hasOverdueHistory = false;
-    const attendanceCounts = { present: 0, absent: 0, justified: 0 };
-    const absenceHistory: AbsenceRecord[] = [];
+    let attendanceCounts = { present: 0, absent: 0, justified: 0 };
+    let absenceHistory: AbsenceRecord[] = [];
 
     if (enrollmentId) {
-      const [feeRes, overdueRes, attendanceRes] = await Promise.all([
-        // Current month fee status
-        supabase
-          .from("monthly_fees")
-          .select("status")
-          .eq("enrollment_id", enrollmentId)
-          .eq("reference_month", referenceMonth)
-          .limit(1),
-        // Any overdue fees in history
-        supabase
-          .from("monthly_fees")
-          .select("id", { count: "exact", head: true })
-          .eq("enrollment_id", enrollmentId)
-          .eq("status", "overdue"),
-        // All attendance records (used for both counts and history)
-        supabase
-          .from("attendance")
-          .select("date, status, justification")
-          .eq("enrollment_id", enrollmentId)
-          .order("date", { ascending: false }),
-      ]);
+      const attendancePromise = supabase
+        .from("attendance")
+        .select("date, status, justification")
+        .eq("enrollment_id", enrollmentId)
+        .order("date", { ascending: false });
 
-      currentMonthStatus = (feeRes.data as FeeStatusRow[] | null)?.[0]?.status ?? null;
-      hasOverdueHistory = (overdueRes.count ?? 0) > 0;
+      if (callerRole === "admin") {
+        const [feeRes, overdueRes, attendanceRes] = await Promise.all([
+          supabase
+            .from("monthly_fees")
+            .select("status")
+            .eq("enrollment_id", enrollmentId)
+            .eq("reference_month", referenceMonth)
+            .limit(1),
+          supabase
+            .from("monthly_fees")
+            .select("id", { count: "exact", head: true })
+            .eq("enrollment_id", enrollmentId)
+            .eq("status", "overdue"),
+          attendancePromise,
+        ]);
 
-      // Single pass: compute monthly counts + build absence history
-      for (const r of (attendanceRes.data ?? []) as AttendanceDetailRow[]) {
-        if (r.date >= start && r.date <= end && r.status in attendanceCounts) {
-          attendanceCounts[r.status]++;
-        }
-        if (r.status === "absent" || r.status === "justified") {
-          if (absenceHistory.length < 20) {
-            absenceHistory.push({
-              date: r.date,
-              status: r.status,
-              justification: r.justification,
-            });
-          }
-        }
+        currentMonthStatus = (feeRes.data as FeeStatusRow[] | null)?.[0]?.status ?? null;
+        hasOverdueHistory = (overdueRes.count ?? 0) > 0;
+
+        const processed = processAttendance(
+          (attendanceRes.data ?? []) as AttendanceDetailRow[],
+          start,
+          end,
+        );
+        attendanceCounts = processed.counts;
+        absenceHistory = processed.history;
+      } else {
+        const attendanceRes = await attendancePromise;
+        const processed = processAttendance(
+          (attendanceRes.data ?? []) as AttendanceDetailRow[],
+          start,
+          end,
+        );
+        attendanceCounts = processed.counts;
+        absenceHistory = processed.history;
       }
     }
 
@@ -167,26 +195,22 @@ export async function getStudentSummary(
           internalObservations: student.internal_observations,
         },
         enrollment: enrollmentInfo,
-        financial: {
-          currentMonthStatus,
-          hasOverdueHistory,
-        },
+        financial: { currentMonthStatus, hasOverdueHistory },
         attendance: attendanceCounts,
         absenceHistory,
       },
     };
-  } catch {
-    return { success: false, error: "Falha ao buscar perfil da aluna." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao buscar perfil da aluna." };
   }
 }
 
-/**
- * Count students with 'absent' attendance status on a given date.
- */
 export async function getTodayAbsencesCount(
   date: string
 ): Promise<ActionResult<number>> {
   try {
+    await requireAuth();
+
     const parsedDate = dateSchema.safeParse(date);
     if (!parsedDate.success) return { success: false, error: "Data invalida." };
 
@@ -198,7 +222,7 @@ export async function getTodayAbsencesCount(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: count ?? 0 };
-  } catch {
-    return { success: false, error: "Falha ao contar faltas." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao contar faltas." };
   }
 }

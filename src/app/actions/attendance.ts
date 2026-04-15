@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAuth, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
@@ -45,6 +46,8 @@ export async function getAttendanceByClassAndDate(
   date: string
 ): Promise<ActionResult<AttendanceRow[]>> {
   try {
+    await requireAuth();
+
     const parsedId = uuidSchema.safeParse(classId);
     const parsedDate = dateSchema.safeParse(date);
     if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
@@ -97,8 +100,8 @@ export async function getAttendanceByClassAndDate(
     rows.sort((a, b) => a.studentName.localeCompare(b.studentName, "pt-BR"));
 
     return { success: true, data: rows };
-  } catch {
-    return { success: false, error: "Falha ao buscar chamada." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao buscar chamada." };
   }
 }
 
@@ -112,6 +115,8 @@ export async function saveAttendance(
   removals: string[] = []
 ): Promise<ActionResult> {
   try {
+    await requireAuth();
+
     const parsedDate = dateSchema.safeParse(date);
     if (!parsedDate.success) return { success: false, error: "Data invalida." };
 
@@ -153,7 +158,7 @@ export async function saveAttendance(
     }
 
     return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Falha ao salvar chamada." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao salvar chamada." };
   }
 }

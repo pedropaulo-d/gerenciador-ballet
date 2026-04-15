@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
@@ -62,6 +63,7 @@ export async function getStudentsPaginated(
   const to = from + pageSize - 1;
 
   try {
+    await requireAuth();
     // When filtering by location or class, we need to find matching student IDs first
     // because Supabase doesn't support filtering parents by nested child relations well.
     let studentIds: string[] | null = null;
@@ -145,8 +147,8 @@ export async function getStudentsPaginated(
         total: count ?? 0,
       },
     };
-  } catch {
-    return { success: false, error: "Falha ao buscar alunas." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao buscar alunas." };
   }
 }
 
@@ -157,6 +159,8 @@ export async function createStudentWithEnrollment(
   enrollmentPayload: Omit<EnrollmentInsert, "student_id">
 ): Promise<ActionResult<Student>> {
   try {
+    await requireAdmin();
+
     const parsedStudent = studentInsertSchema.safeParse(studentPayload);
     if (!parsedStudent.success) return { success: false, error: "Dados da aluna invalidos." };
 
@@ -184,8 +188,8 @@ export async function createStudentWithEnrollment(
     }
 
     return { success: true, data: student as Student };
-  } catch {
-    return { success: false, error: "Falha ao cadastrar aluna." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao cadastrar aluna." };
   }
 }
 
@@ -194,6 +198,8 @@ export async function updateStudent(
   payload: StudentUpdate
 ): Promise<ActionResult<Student>> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
 
@@ -206,13 +212,15 @@ export async function updateStudent(
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as Student };
-  } catch {
-    return { success: false, error: "Falha ao atualizar aluna." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao atualizar aluna." };
   }
 }
 
 export async function deleteStudent(id: string): Promise<ActionResult> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
 
@@ -220,7 +228,7 @@ export async function deleteStudent(id: string): Promise<ActionResult> {
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Falha ao excluir aluna." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao excluir aluna." };
   }
 }

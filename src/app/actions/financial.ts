@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
+import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 
 const supabase = getServiceSupabase();
@@ -86,6 +87,8 @@ export async function getFinancialByMonth(
   filters?: FinancialFilters
 ): Promise<ActionResult<FinancialPageData>> {
   try {
+    await requireAdmin();
+
     const parsed = referenceMonthSchema.safeParse(referenceMonth);
     if (!parsed.success) return { success: false, error: "Mes de referencia invalido." };
     if (!pageSchema.safeParse(page).success) return { success: false, error: "Pagina invalida." };
@@ -164,8 +167,8 @@ export async function getFinancialByMonth(
       success: true,
       data: { fees, total: count ?? 0, summary },
     };
-  } catch {
-    return { success: false, error: "Falha ao buscar dados financeiros." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao buscar dados financeiros." };
   }
 }
 
@@ -265,6 +268,8 @@ export async function generateFeesForMonth(
   referenceMonth: string
 ): Promise<ActionResult<{ created: number; skipped: number }>> {
   try {
+    await requireAdmin();
+
     const parsed = referenceMonthSchema.safeParse(referenceMonth);
     if (!parsed.success) return { success: false, error: "Mes de referencia invalido." };
 
@@ -329,8 +334,8 @@ export async function generateFeesForMonth(
         skipped: enrollments.length - toInsert.length,
       },
     };
-  } catch {
-    return { success: false, error: "Falha ao gerar mensalidades." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao gerar mensalidades." };
   }
 }
 
@@ -341,6 +346,8 @@ export async function undoPayment(
   feeId: string
 ): Promise<ActionResult> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(feeId);
     if (!parsedId.success) return { success: false, error: "ID da mensalidade invalido." };
 
@@ -374,8 +381,8 @@ export async function undoPayment(
 
     if (error) return { success: false, error: "Falha ao desfazer pagamento." };
     return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Falha ao desfazer pagamento." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao desfazer pagamento." };
   }
 }
 
@@ -389,6 +396,8 @@ export async function payFeeManually(
   receivedAmount: number
 ): Promise<ActionResult> {
   try {
+    await requireAdmin();
+
     const parsedId = uuidSchema.safeParse(feeId);
     if (!parsedId.success) return { success: false, error: "ID da mensalidade invalido." };
 
@@ -410,7 +419,7 @@ export async function payFeeManually(
 
     if (error) return { success: false, error: "Falha ao registrar pagamento." };
     return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Falha ao registrar pagamento." };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao registrar pagamento." };
   }
 }

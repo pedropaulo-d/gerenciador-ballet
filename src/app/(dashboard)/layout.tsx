@@ -21,17 +21,19 @@ import {
   SheetTitle,
   SheetClose,
 } from "@/components/ui/sheet";
+import { UserRoleProvider, useIsAdmin, useUserProfileLoading } from "@/lib/user-role-context";
+import { UserNav } from "@/components/user-nav";
 
-const navItems = [
+const allNavItems = [
   { href: "/", label: "Inicio", icon: HomeIcon, exact: true },
   { href: "/attendance", label: "Chamada", icon: ClipboardListIcon },
   { href: "/students", label: "Alunas", icon: UsersIcon },
-  { href: "/finances", label: "Financeiro", icon: DollarSignIcon },
+  { href: "/finances", label: "Financeiro", icon: DollarSignIcon, adminOnly: true },
 ];
 
-const moreItems = [
-  { href: "/classes", label: "Turmas", icon: GraduationCapIcon },
-  { href: "/locations", label: "Locais", icon: MapPinIcon },
+const allMoreItems = [
+  { href: "/classes", label: "Turmas", icon: GraduationCapIcon, adminOnly: true },
+  { href: "/locations", label: "Locais", icon: MapPinIcon, adminOnly: true },
   { href: "/import", label: "Importar Alunas", icon: UploadIcon },
 ];
 
@@ -40,8 +42,23 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <UserRoleProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </UserRoleProvider>
+  );
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isAdmin = useIsAdmin();
+  const isLoading = useUserProfileLoading();
   const [moreOpen, setMoreOpen] = useState(false);
+
+  // While loading, show all items to avoid flash for admin users
+  const showAll = isLoading || isAdmin;
+  const navItems = allNavItems.filter((item) => !item.adminOnly || showAll);
+  const moreItems = allMoreItems.filter((item) => !item.adminOnly || showAll);
 
   const isMoreActive = moreItems.some((item) => pathname.startsWith(item.href));
 
@@ -49,12 +66,13 @@ export default function DashboardLayout({
     <div className="flex min-h-dvh flex-col pb-16">
       {/* ─── Header with gold accent line ─── */}
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="mx-auto flex h-16 max-w-3xl items-center px-5">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5">
           <Link href="/" className="group flex items-baseline gap-2">
             <span className="text-2xl font-bold tracking-tight text-foreground text-shadow-gold">
               Petit Allegro
             </span>
           </Link>
+          <UserNav />
         </div>
         {/* Gold accent line — teatro balcony rail */}
         <div className="h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
