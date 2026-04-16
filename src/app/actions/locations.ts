@@ -1,9 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
+import { safeDbError } from "@/lib/safe-error";
 
 const supabase = getServiceSupabase();
 import type { Location, LocationInsert, LocationUpdate } from "@/types/database";
@@ -17,6 +19,8 @@ const locationInsertSchema = z.object({
   is_active: z.boolean(),
 });
 
+const locationUpdateSchema = locationInsertSchema.partial().strict();
+
 export async function getLocations(): Promise<ActionResult<Location[]>> {
   try {
     await requireAdmin();
@@ -26,7 +30,7 @@ export async function getLocations(): Promise<ActionResult<Location[]>> {
       .select("*")
       .order("name");
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "getLocations") };
     return { success: true, data: data as Location[] };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao buscar locais." };
@@ -48,7 +52,8 @@ export async function createLocation(
       .select()
       .single();
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "createLocation") };
+    revalidatePath("/locations");
     return { success: true, data: data as Location };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao cadastrar local." };
@@ -65,14 +70,18 @@ export async function updateLocation(
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID do local invalido." };
 
+    const parsedPayload = locationUpdateSchema.safeParse(payload);
+    if (!parsedPayload.success) return { success: false, error: "Dados do local invalidos." };
+
     const { data, error } = await supabase
       .from("locations")
-      .update(payload)
+      .update(parsedPayload.data)
       .eq("id", id)
       .select()
       .single();
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "updateLocation") };
+    revalidatePath("/locations");
     return { success: true, data: data as Location };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao atualizar local." };
@@ -93,7 +102,8 @@ export async function deleteLocation(
       .delete()
       .eq("id", id);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "deleteLocation") };
+    revalidatePath("/locations");
     return { success: true, data: null };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao excluir local." };

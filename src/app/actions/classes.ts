@@ -1,9 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
+import { safeDbError } from "@/lib/safe-error";
 
 const supabase = getServiceSupabase();
 import type {
@@ -25,6 +27,8 @@ const classInsertSchema = z.object({
   is_active: z.boolean(),
 });
 
+const classUpdateSchema = classInsertSchema.partial().strict();
+
 export async function getClassesWithLocation(
   locationId?: string
 ): Promise<ActionResult<ClassWithLocation[]>> {
@@ -43,7 +47,7 @@ export async function getClassesWithLocation(
 
     const { data, error } = await query;
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "getClassesWithLocation") };
     return { success: true, data: data as ClassWithLocation[] };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao buscar turmas." };
@@ -65,7 +69,8 @@ export async function createClass(
       .select()
       .single();
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "createClass") };
+    revalidatePath("/classes");
     return { success: true, data: data as Class };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao cadastrar turma." };
@@ -82,14 +87,18 @@ export async function updateClass(
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
 
+    const parsedPayload = classUpdateSchema.safeParse(payload);
+    if (!parsedPayload.success) return { success: false, error: "Dados da turma invalidos." };
+
     const { data, error } = await supabase
       .from("classes")
-      .update(payload)
+      .update(parsedPayload.data)
       .eq("id", id)
       .select()
       .single();
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "updateClass") };
+    revalidatePath("/classes");
     return { success: true, data: data as Class };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao atualizar turma." };
@@ -105,7 +114,8 @@ export async function deleteClass(id: string): Promise<ActionResult> {
 
     const { error } = await supabase.from("classes").delete().eq("id", id);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "deleteClass") };
+    revalidatePath("/classes");
     return { success: true, data: null };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao excluir turma." };

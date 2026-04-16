@@ -182,8 +182,13 @@ create trigger trg_profiles_updated_at
   before update on profiles for each row execute function update_updated_at();
 
 -- Cria profile automaticamente ao inserir usuário no auth.users
+-- search_path fixo previne privilege escalation via shadowing de nomes.
 create or replace function handle_new_user()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   insert into public.profiles (id, full_name, role)
   values (
@@ -193,7 +198,7 @@ begin
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
 
 create trigger on_auth_user_created
   after insert on auth.users
@@ -210,13 +215,60 @@ alter table monthly_fees enable row level security;
 alter table attendance   enable row level security;
 alter table profiles     enable row level security;
 
--- Políticas de acesso: apenas usuários autenticados (single-tenant)
-create policy "Allow all for authenticated" on locations    for all to authenticated using (true) with check (true);
-create policy "Allow all for authenticated" on classes      for all to authenticated using (true) with check (true);
-create policy "Allow all for authenticated" on students     for all to authenticated using (true) with check (true);
-create policy "Allow all for authenticated" on enrollments  for all to authenticated using (true) with check (true);
-create policy "Allow all for authenticated" on monthly_fees for all to authenticated using (true) with check (true);
-create policy "Allow all for authenticated" on attendance   for all to authenticated using (true) with check (true);
+-- Helper: verifica se o usuario logado tem role admin
+-- search_path fixo previne privilege escalation.
+create or replace function is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
+-- Políticas de acesso: SELECT para todos autenticados, escrita apenas admin
+-- (Defesa em profundidade — o app usa service_role que bypassa RLS,
+--  mas isto bloqueia acesso direto nao autorizado via REST API)
+
+-- locations
+create policy "Authenticated can read locations"  on locations for select to authenticated using (true);
+create policy "Admin can insert locations"         on locations for insert to authenticated with check (is_admin());
+create policy "Admin can update locations"         on locations for update to authenticated using (is_admin());
+create policy "Admin can delete locations"         on locations for delete to authenticated using (is_admin());
+
+-- classes
+create policy "Authenticated can read classes"  on classes for select to authenticated using (true);
+create policy "Admin can insert classes"         on classes for insert to authenticated with check (is_admin());
+create policy "Admin can update classes"         on classes for update to authenticated using (is_admin());
+create policy "Admin can delete classes"         on classes for delete to authenticated using (is_admin());
+
+-- students
+create policy "Authenticated can read students"  on students for select to authenticated using (true);
+create policy "Admin can insert students"         on students for insert to authenticated with check (is_admin());
+create policy "Admin can update students"         on students for update to authenticated using (is_admin());
+create policy "Admin can delete students"         on students for delete to authenticated using (is_admin());
+
+-- enrollments
+create policy "Authenticated can read enrollments"  on enrollments for select to authenticated using (true);
+create policy "Admin can insert enrollments"         on enrollments for insert to authenticated with check (is_admin());
+create policy "Admin can update enrollments"         on enrollments for update to authenticated using (is_admin());
+create policy "Admin can delete enrollments"         on enrollments for delete to authenticated using (is_admin());
+
+-- monthly_fees
+create policy "Authenticated can read monthly_fees"  on monthly_fees for select to authenticated using (true);
+create policy "Admin can insert monthly_fees"         on monthly_fees for insert to authenticated with check (is_admin());
+create policy "Admin can update monthly_fees"         on monthly_fees for update to authenticated using (is_admin());
+create policy "Admin can delete monthly_fees"         on monthly_fees for delete to authenticated using (is_admin());
+
+-- attendance (teacher pode INSERT/UPDATE para chamada, apenas admin pode DELETE)
+create policy "Authenticated can read attendance"    on attendance for select to authenticated using (true);
+create policy "Authenticated can insert attendance"  on attendance for insert to authenticated with check (true);
+create policy "Authenticated can update attendance"  on attendance for update to authenticated using (true);
+create policy "Admin can delete attendance"          on attendance for delete to authenticated using (is_admin());
 
 -- Profiles: usuário pode ler seu próprio perfil; admin pode ler todos
 create policy "Users can read own profile" on profiles
@@ -228,6 +280,10 @@ create policy "Admin can update profiles" on profiles
   for update to authenticated
   using (exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin'));
 
--- IMPORTANTE: Nenhuma policy para 'anon'. A anon key (pública) não tem acesso.
--- O webhook Asaas deve usar SUPABASE_SERVICE_ROLE_KEY, que bypassa RLS.
--- O trigger handle_new_user() usa SECURITY DEFINER para inserir profiles (bypassa RLS).
+-- NOTAS DE SEGURANÇA:
+-- 1. Nenhuma policy para 'anon'. A anon key (pública) não tem acesso a dados.
+-- 2. O webhook Asaas usa SUPABASE_SERVICE_ROLE_KEY, que bypassa RLS.
+-- 3. O trigger handle_new_user() usa SECURITY DEFINER para inserir profiles.
+-- 4. O app usa service_role para todas as queries (bypassa RLS).
+--    RLS funciona como defesa em profundidade contra acesso REST direto.
+-- 5. attendance permite INSERT/UPDATE para todos autenticados (teachers fazem chamada).

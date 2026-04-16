@@ -8,6 +8,7 @@ import {
   generateFeesForMonth,
   payFeeManually,
   undoPayment,
+  deleteMonthlyFees,
   type FinancialSummary as SummaryData,
   type FinancialFilters,
 } from "@/app/actions/financial";
@@ -21,8 +22,19 @@ import { PaginationControls } from "@/components/ui/pagination-controls";
 import { PayFeeDialog } from "@/components/financial/pay-fee-dialog";
 import { useUrlParams } from "@/lib/use-url-params";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { getCurrentMonth } from "@/lib/formatters";
-import { LoaderIcon, PlusCircleIcon } from "lucide-react";
+import { LoaderIcon, PlusCircleIcon, Trash2Icon } from "lucide-react";
 
 const PAGE_SIZE = 15;
 const ALL = "__all__";
@@ -55,6 +67,9 @@ export function FinancesList() {
   const [classes, setClasses] = useState<ClassWithLocation[]>([]);
   const [generating, setGenerating] = useState(false);
   const [payingFee, setPayingFee] = useState<MonthlyFeeWithDetails | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -69,6 +84,7 @@ export function FinancesList() {
 
   const fetchData = useCallback(() => {
     startTransition(async () => {
+      setSelectedIds([]);
       const result = await getFinancialByMonth(urlMonth, urlPage, PAGE_SIZE, filters);
       if (result.success) {
         setFees(result.data.fees);
@@ -142,6 +158,39 @@ export function FinancesList() {
     }
   }
 
+  function handleToggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  }
+
+  function handleToggleAll() {
+    if (selectedIds.length === fees.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(fees.map((f) => f.id));
+    }
+  }
+
+  async function handleDeleteSelected() {
+    setDeleting(true);
+    const result = await deleteMonthlyFees(selectedIds);
+    setDeleting(false);
+    setShowDeleteDialog(false);
+
+    if (result.success) {
+      toast.success(`${result.data.deleted} mensalidade(s) excluída(s).`);
+      setSelectedIds([]);
+      fetchData();
+    } else {
+      toast.error("Erro ao excluir mensalidades", { description: result.error });
+    }
+  }
+
+
+  const allSelected = fees.length > 0 && selectedIds.length === fees.length;
+  const someSelected = selectedIds.length > 0;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -180,11 +229,36 @@ export function FinancesList() {
 
       {!isPending && <FinancialSummary summary={summary} />}
 
+      {!isPending && fees.length > 0 && (
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={handleToggleAll}
+              aria-label="Selecionar todas as mensalidades"
+            />
+            <span className="text-muted-foreground">Selecionar todas</span>
+          </label>
+          {someSelected && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2Icon className="size-3.5" />
+              Excluir ({selectedIds.length})
+            </Button>
+          )}
+        </div>
+      )}
+
       <FeesTable
         fees={fees}
         loading={isPending}
         onPayManually={setPayingFee}
         onUndoPayment={handleUndoPayment}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
       />
 
       <PaginationControls
@@ -199,6 +273,34 @@ export function FinancesList() {
         onOpenChange={(open) => !open && setPayingFee(null)}
         onConfirm={handlePayManually}
       />
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir mensalidades</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir permanentemente{" "}
+              <strong>{selectedIds.length}</strong> mensalidade(s)? Esta ação
+              não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDeleteSelected}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <LoaderIcon className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2Icon className="size-3.5" />
+              )}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

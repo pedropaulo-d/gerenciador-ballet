@@ -6,6 +6,7 @@ import { requireAuth, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 import type { AttendanceStatus } from "@/types/database";
 import { getCurrentMonth, getCurrentMonthRange } from "@/lib/formatters";
+import { safeDbError } from "@/lib/safe-error";
 
 const supabase = getServiceSupabase();
 
@@ -94,15 +95,32 @@ export async function getStudentSummary(
     const parsedId = uuidSchema.safeParse(studentId);
     if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
 
-    // 1. Student data
+    // Auth first: role gates both financial data and internal_observations.
+    const { role: callerRole } = await requireAuth();
+    const isAdmin = callerRole === "admin";
+
+    // 1. Student data — internal_observations is admin-only
+    // (disciplinary/admin notes; teacher must not see it).
+    const studentColumns = isAdmin
+      ? "id, full_name, birth_date, guardian_name, guardian_phone, medical_notes, internal_observations"
+      : "id, full_name, birth_date, guardian_name, guardian_phone, medical_notes";
+
     const { data: student, error: studentError } = await supabase
       .from("students")
-      .select("id, full_name, birth_date, guardian_name, guardian_phone, medical_notes, internal_observations")
+      .select(studentColumns)
       .eq("id", studentId)
-      .single();
+      .single<{
+        id: string;
+        full_name: string;
+        birth_date: string | null;
+        guardian_name: string;
+        guardian_phone: string | null;
+        medical_notes: string | null;
+        internal_observations?: string | null;
+      }>();
 
     if (studentError || !student) {
-      return { success: false, error: studentError?.message ?? "Aluna não encontrada." };
+      return { success: false, error: safeDbError(studentError, "getStudentSummary:fetch") };
     }
 
     // 2. Active enrollment with class + location
@@ -126,10 +144,7 @@ export async function getStudentSummary(
         }
       : null;
 
-    // 3. Caller role (determines financial visibility + enforces auth)
-    const { role: callerRole } = await requireAuth();
-
-    // 4. Financial + Attendance
+    // 3. Financial + Attendance (role resolved above gates financial visibility)
     const referenceMonth = getCurrentMonth();
     const { start, end } = getCurrentMonthRange();
     let currentMonthStatus: string | null = null;
@@ -144,7 +159,7 @@ export async function getStudentSummary(
         .eq("enrollment_id", enrollmentId)
         .order("date", { ascending: false });
 
-      if (callerRole === "admin") {
+      if (isAdmin) {
         const [feeRes, overdueRes, attendanceRes] = await Promise.all([
           supabase
             .from("monthly_fees")
@@ -192,7 +207,7 @@ export async function getStudentSummary(
           guardianName: student.guardian_name,
           guardianPhone: student.guardian_phone,
           medicalNotes: student.medical_notes,
-          internalObservations: student.internal_observations,
+          internalObservations: isAdmin ? student.internal_observations ?? null : null,
         },
         enrollment: enrollmentInfo,
         financial: { currentMonthStatus, hasOverdueHistory },
@@ -220,7 +235,7 @@ export async function getTodayAbsencesCount(
       .eq("date", date)
       .eq("status", "absent");
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "getTodayAbsencesCount") };
     return { success: true, data: count ?? 0 };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao contar faltas." };

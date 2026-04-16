@@ -8,6 +8,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   PencilIcon,
   Trash2Icon,
@@ -28,6 +29,8 @@ interface StudentsTableProps {
   onDelete: (student: StudentWithEnrollments) => void;
   onViewProfile: (student: StudentWithEnrollments) => void;
   onCreateFirst: () => void;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
 }
 
 export function StudentsTable({
@@ -38,6 +41,8 @@ export function StudentsTable({
   onDelete,
   onViewProfile,
   onCreateFirst,
+  selectedIds,
+  onToggleSelect,
 }: StudentsTableProps) {
   if (loading) {
     return (
@@ -75,9 +80,21 @@ export function StudentsTable({
           (e) => e.status === "active"
         );
 
+        const isSelected = selectedIds?.includes(student.id) ?? false;
+
         return (
           <Card key={student.id} size="sm">
-            <CardContent className="flex flex-col gap-3 py-5 px-5">
+            <CardContent className="flex gap-3 py-5 px-5">
+              {onToggleSelect && (
+                <div className="flex items-start pt-1 shrink-0">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => onToggleSelect(student.id)}
+                    aria-label={`Selecionar ${student.full_name}`}
+                  />
+                </div>
+              )}
+              <div className="flex flex-col gap-3 min-w-0 flex-1">
               {/* Row: Name + Actions */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-1.5">
@@ -162,6 +179,7 @@ export function StudentsTable({
                     <span>Sem matricula ativa</span>
                   </div>
                 )}
+              </div>
               </div>
             </CardContent>
           </Card>

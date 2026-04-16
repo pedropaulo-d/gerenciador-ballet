@@ -2,6 +2,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/auth-guard";
+import { safeDbError } from "@/lib/safe-error";
 
 const supabase = getServiceSupabase();
 
@@ -240,7 +241,7 @@ export async function importStudentsFromCsv(
           row: rowNum,
           studentName,
           success: false,
-          error: `Erro ao inserir aluna: ${studentError?.message}`,
+          error: `Erro ao inserir aluna: ${safeDbError(studentError, "importStudents:student")}`,
         });
         failed++;
         continue;
@@ -275,7 +276,7 @@ export async function importStudentsFromCsv(
           row: rowNum,
           studentName,
           success: false,
-          error: `Erro ao criar matrícula: ${enrollmentError.message}`,
+          error: `Erro ao criar matrícula: ${safeDbError(enrollmentError, "importStudents:enrollment")}`,
         });
         failed++;
         continue;
@@ -285,11 +286,12 @@ export async function importStudentsFromCsv(
       results.push({ row: rowNum, studentName, success: true });
       imported++;
     } catch (err) {
+      console.error("[importStudents:unexpected]", err);
       results.push({
         row: rowNum,
         studentName,
         success: false,
-        error: `Erro inesperado: ${err instanceof Error ? err.message : String(err)}`,
+        error: "Erro inesperado ao processar esta linha.",
       });
       failed++;
     }

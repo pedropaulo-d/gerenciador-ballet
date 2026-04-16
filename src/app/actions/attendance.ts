@@ -1,9 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
+import { safeDbError } from "@/lib/safe-error";
 
 const supabase = getServiceSupabase();
 import type { AttendanceRow, AttendanceStatus } from "@/types/database";
@@ -61,7 +63,7 @@ export async function getAttendanceByClassAndDate(
       .eq("status", "active")
       .order("id");
 
-    if (enrollError) return { success: false, error: enrollError.message };
+    if (enrollError) return { success: false, error: safeDbError(enrollError, "getAttendanceByClassAndDate:enrollments") };
     if (!enrollments || enrollments.length === 0) {
       return { success: true, data: [] };
     }
@@ -76,7 +78,7 @@ export async function getAttendanceByClassAndDate(
       .in("enrollment_id", enrollmentIds)
       .eq("date", date);
 
-    if (attError) return { success: false, error: attError.message };
+    if (attError) return { success: false, error: safeDbError(attError, "getAttendanceByClassAndDate:attendance") };
 
     const recordMap = new Map<string, { status: AttendanceStatus; justification: string | null }>();
     for (const r of (records ?? []) as AttendanceRecord[]) {
@@ -138,7 +140,7 @@ export async function saveAttendance(
         .in("enrollment_id", removals)
         .eq("date", date);
 
-      if (deleteError) return { success: false, error: deleteError.message };
+      if (deleteError) return { success: false, error: safeDbError(deleteError, "saveAttendance:delete") };
     }
 
     // Upsert active records
@@ -154,9 +156,10 @@ export async function saveAttendance(
         .from("attendance")
         .upsert(rows, { onConflict: "enrollment_id,date" });
 
-      if (error) return { success: false, error: error.message };
+      if (error) return { success: false, error: safeDbError(error, "saveAttendance:upsert") };
     }
 
+    revalidatePath("/attendance");
     return { success: true, data: null };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao salvar chamada." };

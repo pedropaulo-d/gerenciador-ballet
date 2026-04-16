@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
@@ -325,6 +326,7 @@ export async function generateFeesForMonth(
         .insert(toInsert);
 
       if (insertError) return { success: false, error: "Falha ao inserir mensalidades." };
+      revalidatePath("/finances");
     }
 
     return {
@@ -380,9 +382,49 @@ export async function undoPayment(
       .eq("id", feeId);
 
     if (error) return { success: false, error: "Falha ao desfazer pagamento." };
+    revalidatePath("/finances");
     return { success: true, data: null };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao desfazer pagamento." };
+  }
+}
+
+/**
+ * Delete monthly fees in batch (admin only).
+ * Accepts an array of fee IDs and removes them permanently.
+ */
+export async function deleteMonthlyFees(
+  ids: string[]
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    await requireAdmin();
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return { success: false, error: "Nenhuma mensalidade selecionada." };
+    }
+
+    if (ids.length > 500) {
+      return { success: false, error: "Maximo de 500 mensalidades por vez." };
+    }
+
+    for (const id of ids) {
+      if (!uuidSchema.safeParse(id).success) {
+        return { success: false, error: "ID de mensalidade invalido." };
+      }
+    }
+
+    const { error, count } = await supabase
+      .from("monthly_fees")
+      .delete({ count: "exact" })
+      .in("id", ids);
+
+    if (error) return { success: false, error: "Falha ao excluir mensalidades." };
+
+    revalidatePath("/finances");
+
+    return { success: true, data: { deleted: count ?? ids.length } };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao excluir mensalidades." };
   }
 }
 
@@ -418,6 +460,7 @@ export async function payFeeManually(
       .eq("id", feeId);
 
     if (error) return { success: false, error: "Falha ao registrar pagamento." };
+    revalidatePath("/finances");
     return { success: true, data: null };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao registrar pagamento." };

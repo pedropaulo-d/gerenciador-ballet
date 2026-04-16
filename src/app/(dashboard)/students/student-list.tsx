@@ -14,6 +14,7 @@ import {
   createStudentWithEnrollment,
   updateStudent,
   deleteStudent,
+  deleteStudents,
 } from "@/app/actions/students";
 import {
   formDataToStudentPayload,
@@ -24,11 +25,22 @@ import { StudentFilters } from "@/components/students/student-filters";
 import { StudentsTable } from "@/components/students/students-table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { StudentFormDialog } from "@/components/students/student-form-dialog";
-import { StudentDeleteDialog } from "@/components/students/student-delete-dialog";
+import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { StudentProfileSheet } from "@/components/students/student-profile-sheet";
 import { useUrlParams } from "@/lib/use-url-params";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, UploadIcon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { PlusIcon, UploadIcon, Trash2Icon, LoaderIcon } from "lucide-react";
 import Link from "next/link";
 
 const PAGE_SIZE = 10;
@@ -57,6 +69,9 @@ export function StudentList() {
   const [deletingStudent, setDeletingStudent] =
     useState<StudentWithEnrollments | null>(null);
   const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showDeleteBatchDialog, setShowDeleteBatchDialog] = useState(false);
+  const [deletingBatch, setDeletingBatch] = useState(false);
 
   // -- Data fetching --
 
@@ -73,6 +88,7 @@ export function StudentList() {
 
   const fetchStudents = useCallback(() => {
     startTransition(async () => {
+      setSelectedIds([]);
       const result = await getStudentsPaginated({
         search: urlSearch || undefined,
         locationId: urlLocationId !== ALL ? urlLocationId : undefined,
@@ -136,6 +152,41 @@ export function StudentList() {
     fetchStudents();
   }
 
+  // -- Batch selection --
+
+  function handleToggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  }
+
+  function handleToggleAll() {
+    if (selectedIds.length === students.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(students.map((s) => s.id));
+    }
+  }
+
+  async function handleDeleteBatch() {
+    setDeletingBatch(true);
+    const result = await deleteStudents(selectedIds);
+    setDeletingBatch(false);
+    setShowDeleteBatchDialog(false);
+
+    if (result.success) {
+      toast.success(`${result.data.deleted} aluna(s) excluída(s).`);
+      setSelectedIds([]);
+      fetchStudents();
+    } else {
+      toast.error("Erro ao excluir alunas", { description: result.error });
+    }
+  }
+
+
+  const allSelected = students.length > 0 && selectedIds.length === students.length;
+  const someSelected = selectedIds.length > 0;
+
   // -- Render --
 
   return (
@@ -173,6 +224,29 @@ export function StudentList() {
         </p>
       )}
 
+      {!isPending && students.length > 0 && (
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={handleToggleAll}
+              aria-label="Selecionar todas as alunas"
+            />
+            <span className="text-muted-foreground">Selecionar todas</span>
+          </label>
+          {someSelected && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteBatchDialog(true)}
+            >
+              <Trash2Icon className="size-3.5" />
+              Excluir ({selectedIds.length})
+            </Button>
+          )}
+        </div>
+      )}
+
       <StudentsTable
         students={students}
         loading={isPending}
@@ -181,6 +255,8 @@ export function StudentList() {
         onDelete={(s) => { setDeletingStudent(s); setDeleteDialogOpen(true); }}
         onViewProfile={(s) => setProfileStudentId(s.id)}
         onCreateFirst={openCreate}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
       />
 
       <PaginationControls
@@ -197,10 +273,18 @@ export function StudentList() {
         onSubmit={handleFormSubmit}
       />
 
-      <StudentDeleteDialog
-        student={deletingStudent}
+      <DeleteDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
+        title="Excluir Aluna"
+        description={
+          <>
+            Tem certeza que deseja excluir{" "}
+            <strong>{deletingStudent?.full_name}</strong>? Todas as matrículas
+            vinculadas também serão removidas.
+          </>
+        }
+        itemId={deletingStudent?.id ?? null}
         onConfirm={handleDelete}
       />
 
@@ -209,6 +293,34 @@ export function StudentList() {
         open={profileStudentId !== null}
         onOpenChange={(open) => !open && setProfileStudentId(null)}
       />
+
+      <AlertDialog open={showDeleteBatchDialog} onOpenChange={setShowDeleteBatchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir alunas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{selectedIds.length}</strong>{" "}
+              aluna(s)? Esta ação apagará permanentemente o cadastro, além de
+              todo o histórico de faltas e mensalidades associadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingBatch}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDeleteBatch}
+              disabled={deletingBatch}
+            >
+              {deletingBatch ? (
+                <LoaderIcon className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2Icon className="size-3.5" />
+              )}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

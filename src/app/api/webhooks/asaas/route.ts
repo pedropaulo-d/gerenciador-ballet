@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { getServiceSupabase } from "@/lib/supabase";
 
 const supabase = getServiceSupabase();
+
+// Hash both inputs to SHA-256 so the compare runs on equal-length buffers —
+// avoids leaking token length via timingSafeEqual's length precheck.
+function safeTokenEqual(a: string, b: string): boolean {
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
 
 /**
  * Asaas Webhook handler.
@@ -10,9 +19,26 @@ const supabase = getServiceSupabase();
  *   POST https://<your-domain>/api/webhooks/asaas
  *
  * Required env var: ASAAS_WEBHOOK_TOKEN
+ * Optional env var: ASAAS_IP_ALLOWLIST (comma-separated). When set, rejects
+ * requests whose leftmost x-forwarded-for entry is not in the list. Only
+ * reliable behind a trusted reverse proxy (Vercel/Coolify); leave empty on
+ * direct-exposed deploys.
  */
 
 const ASAAS_WEBHOOK_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN;
+const ASAAS_IP_ALLOWLIST = (process.env.ASAAS_IP_ALLOWLIST ?? "")
+  .split(",")
+  .map((ip) => ip.trim())
+  .filter(Boolean);
+
+function isAllowedOriginIp(request: NextRequest): boolean {
+  if (ASAAS_IP_ALLOWLIST.length === 0) return true;
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (!forwardedFor) return false;
+  const clientIp = forwardedFor.split(",")[0]?.trim();
+  if (!clientIp) return false;
+  return ASAAS_IP_ALLOWLIST.includes(clientIp);
+}
 
 type AsaasEvent =
   | "PAYMENT_RECEIVED"
@@ -49,8 +75,13 @@ export async function POST(request: NextRequest) {
   }
 
   const token = request.headers.get("asaas-access-token");
-  if (token !== ASAAS_WEBHOOK_TOKEN) {
+  if (!token || !safeTokenEqual(token, ASAAS_WEBHOOK_TOKEN)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // --- 1b. Defense-in-depth: reject non-Asaas origin IPs when configured ---
+  if (!isAllowedOriginIp(request)) {
+    return NextResponse.json({ error: "Forbidden origin" }, { status: 403 });
   }
 
   // --- 2. Parse and validate payload ---

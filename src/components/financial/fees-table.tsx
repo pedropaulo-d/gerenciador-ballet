@@ -9,6 +9,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DollarSignIcon,
   GraduationCapIcon,
@@ -33,9 +34,11 @@ interface FeesTableProps {
   loading: boolean;
   onPayManually?: (fee: MonthlyFeeWithDetails) => void;
   onUndoPayment?: (feeId: string) => Promise<void>;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
 }
 
-export function FeesTable({ fees, loading, onPayManually, onUndoPayment }: FeesTableProps) {
+export function FeesTable({ fees, loading, onPayManually, onUndoPayment, selectedIds, onToggleSelect }: FeesTableProps) {
   const [undoingId, setUndoingId] = useState<string | null>(null);
 
   if (loading) {
@@ -73,9 +76,21 @@ export function FeesTable({ fees, loading, onPayManually, onUndoPayment }: FeesT
         const canUndo = fee.status === "paid";
         const isUndoing = undoingId === fee.id;
 
+        const isSelected = selectedIds?.includes(fee.id) ?? false;
+
         return (
           <Card key={fee.id} size="sm">
-            <CardContent className="flex flex-col gap-3 py-5 px-5">
+            <CardContent className="flex gap-3 py-5 px-5">
+              {onToggleSelect && (
+                <div className="flex items-start pt-1 shrink-0">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => onToggleSelect(fee.id)}
+                    aria-label={`Selecionar mensalidade de ${student?.full_name ?? "aluna"}`}
+                  />
+                </div>
+              )}
+              <div className="flex flex-col gap-3 min-w-0 flex-1">
               {/* The star: student name + status badge */}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="min-w-0 truncate text-lg sm:text-xl font-bold tracking-tight text-foreground">
@@ -141,6 +156,7 @@ export function FeesTable({ fees, loading, onPayManually, onUndoPayment }: FeesT
                   )}
                 </div>
               )}
+              </div>
             </CardContent>
           </Card>
         );

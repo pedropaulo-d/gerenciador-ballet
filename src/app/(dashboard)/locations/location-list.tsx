@@ -12,7 +12,7 @@ import {
 import { formDataToPayload, type LocationFormData } from "@/components/locations/location-form";
 import { LocationsTable } from "@/components/locations/locations-table";
 import { LocationFormDialog } from "@/components/locations/location-form-dialog";
-import { LocationDeleteDialog } from "@/components/locations/location-delete-dialog";
+import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 
@@ -98,10 +98,18 @@ export function LocationList() {
         onSubmit={handleFormSubmit}
       />
 
-      <LocationDeleteDialog
-        location={deletingLocation}
+      <DeleteDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
+        title="Excluir Local"
+        description={
+          <>
+            Tem certeza que deseja excluir{" "}
+            <strong>{deletingLocation?.name}</strong>? Todas as turmas
+            vinculadas também serão removidas.
+          </>
+        }
+        itemId={deletingLocation?.id ?? null}
         onConfirm={handleDelete}
       />
     </div>

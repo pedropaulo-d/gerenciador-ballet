@@ -4,6 +4,7 @@ import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 import { nowBrasilia } from "@/lib/formatters";
+import { safeDbError } from "@/lib/safe-error";
 
 const supabase = getServiceSupabase();
 
@@ -43,7 +44,7 @@ export async function getTodayBirthdays(): Promise<
       .eq("is_active", true)
       .not("birth_date", "is", null);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "getTodayBirthdays") };
 
     const rows = (data ?? []) as unknown as BirthdayRow[];
 

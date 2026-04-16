@@ -1,9 +1,11 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
+import { safeDbError } from "@/lib/safe-error";
 
 const supabase = getServiceSupabase();
 import type {
@@ -39,6 +41,10 @@ const enrollmentInsertSchema = z.object({
   base_fee: z.number().nonnegative().max(99_999_999.99),
   due_day: z.union([z.literal(5), z.literal(7)]),
 });
+
+// Strict partial: whitelists editable fields and rejects unknown keys to
+// prevent mass-assignment (e.g. client forging created_at or unrelated cols).
+const studentUpdateSchema = studentInsertSchema.partial().strict();
 
 // ---------- Paginated list with filters ----------
 
@@ -94,7 +100,7 @@ export async function getStudentsPaginated(
       }
 
       const { data: enrollments, error: enrollError } = await enrollmentQuery;
-      if (enrollError) return { success: false, error: enrollError.message };
+      if (enrollError) return { success: false, error: safeDbError(enrollError, "getStudentsPaginated:enrollments") };
 
       studentIds = [
         ...new Set(
@@ -138,7 +144,7 @@ export async function getStudentsPaginated(
 
     const { data, error, count } = await query;
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "getStudentsPaginated:students") };
 
     return {
       success: true,
@@ -173,7 +179,7 @@ export async function createStudentWithEnrollment(
       .select()
       .single();
 
-    if (studentError) return { success: false, error: studentError.message };
+    if (studentError) return { success: false, error: safeDbError(studentError, "createStudentWithEnrollment:student") };
 
     const { error: enrollmentError } = await supabase
       .from("enrollments")
@@ -184,9 +190,10 @@ export async function createStudentWithEnrollment(
 
     if (enrollmentError) {
       await supabase.from("students").delete().eq("id", student.id);
-      return { success: false, error: enrollmentError.message };
+      return { success: false, error: safeDbError(enrollmentError, "createStudentWithEnrollment:enrollment") };
     }
 
+    revalidatePath("/students");
     return { success: true, data: student as Student };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao cadastrar aluna." };
@@ -203,14 +210,18 @@ export async function updateStudent(
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
 
+    const parsedPayload = studentUpdateSchema.safeParse(payload);
+    if (!parsedPayload.success) return { success: false, error: "Dados da aluna invalidos." };
+
     const { data, error } = await supabase
       .from("students")
-      .update(payload)
+      .update(parsedPayload.data)
       .eq("id", id)
       .select()
       .single();
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "updateStudent") };
+    revalidatePath("/students");
     return { success: true, data: data as Student };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao atualizar aluna." };
@@ -226,9 +237,49 @@ export async function deleteStudent(id: string): Promise<ActionResult> {
 
     const { error } = await supabase.from("students").delete().eq("id", id);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeDbError(error, "deleteStudent") };
+    revalidatePath("/students");
     return { success: true, data: null };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao excluir aluna." };
+  }
+}
+
+/**
+ * Delete students in batch (admin only).
+ * CASCADE in the schema handles enrollments, monthly_fees and attendance automatically.
+ */
+export async function deleteStudents(
+  ids: string[]
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    await requireAdmin();
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return { success: false, error: "Nenhuma aluna selecionada." };
+    }
+
+    if (ids.length > 500) {
+      return { success: false, error: "Maximo de 500 alunas por vez." };
+    }
+
+    for (const id of ids) {
+      if (!uuidSchema.safeParse(id).success) {
+        return { success: false, error: "ID de aluna invalido." };
+      }
+    }
+
+    const { error, count } = await supabase
+      .from("students")
+      .delete({ count: "exact" })
+      .in("id", ids);
+
+    if (error) return { success: false, error: "Falha ao excluir alunas." };
+
+    revalidatePath("/students");
+
+    return { success: true, data: { deleted: count ?? ids.length } };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao excluir alunas." };
   }
 }

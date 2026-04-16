@@ -98,7 +98,10 @@ export async function signOut(): Promise<ActionResult> {
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut();
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      console.error('[signOut]', error.message);
+      return { success: false, error: 'Falha ao encerrar sessão.' };
+    }
     return { success: true, data: null };
   } catch {
     return { success: false, error: 'Falha ao encerrar sessão.' };

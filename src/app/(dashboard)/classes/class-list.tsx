@@ -13,7 +13,7 @@ import {
 import { formDataToPayload, type ClassFormData } from "@/components/classes/class-form";
 import { ClassesTable } from "@/components/classes/classes-table";
 import { ClassFormDialog } from "@/components/classes/class-form-dialog";
-import { ClassDeleteDialog } from "@/components/classes/class-delete-dialog";
+import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -146,10 +146,18 @@ export function ClassList() {
         onSubmit={handleFormSubmit}
       />
 
-      <ClassDeleteDialog
-        classItem={deletingClass}
+      <DeleteDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
+        title="Excluir Turma"
+        description={
+          <>
+            Tem certeza que deseja excluir{" "}
+            <strong>{deletingClass?.name}</strong>? Todas as matrículas
+            vinculadas também serão removidas.
+          </>
+        }
+        itemId={deletingClass?.id ?? null}
         onConfirm={handleDelete}
       />
     </div>
