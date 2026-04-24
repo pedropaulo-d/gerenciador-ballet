@@ -1,52 +1,44 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { getUserProfile, type UserProfile } from "@/app/actions/auth";
+import { createContext, useContext } from "react";
 
-type UserProfileState = {
-  profile: UserProfile | null;
-  loading: boolean;
+export type UserProfile = {
+  fullName: string;
+  role: "admin" | "teacher";
 };
 
-const UserProfileContext = createContext<UserProfileState>({
-  profile: null,
-  loading: true,
-});
+const UserProfileContext = createContext<UserProfile | null>(null);
 
-export function UserRoleProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<UserProfileState>({
-    profile: null,
-    loading: true,
-  });
-
-  useEffect(() => {
-    getUserProfile()
-      .then((result) => {
-        setState({
-          profile: result.success ? result.data : null,
-          loading: false,
-        });
-      })
-      .catch(() => {
-        setState({ profile: null, loading: false });
-      });
-  }, []);
-
+/**
+ * Provider alimentado pelo Server Component (dashboard layout).
+ * Não faz fetch — apenas distribui o profile já carregado no servidor.
+ */
+export function UserRoleProvider({
+  profile,
+  children,
+}: {
+  profile: UserProfile;
+  children: React.ReactNode;
+}) {
   return (
-    <UserProfileContext.Provider value={state}>
+    <UserProfileContext.Provider value={profile}>
       {children}
     </UserProfileContext.Provider>
   );
 }
 
 export function useUserProfile(): UserProfile | null {
-  return useContext(UserProfileContext).profile;
+  return useContext(UserProfileContext);
 }
 
+/**
+ * Mantido por compatibilidade de assinatura. Como o profile é pré-carregado
+ * no servidor, nunca está "loading" no cliente.
+ */
 export function useUserProfileLoading(): boolean {
-  return useContext(UserProfileContext).loading;
+  return false;
 }
 
 export function useIsAdmin(): boolean {
-  return useContext(UserProfileContext).profile?.role === "admin";
+  return useContext(UserProfileContext)?.role === "admin";
 }

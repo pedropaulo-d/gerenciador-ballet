@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type {
   Location,
   ClassWithLocation,
   StudentWithEnrollments,
 } from "@/types/database";
-import { getLocations } from "@/app/actions/locations";
-import { getClassesWithLocation } from "@/app/actions/classes";
 import {
-  getStudentsPaginated,
   createStudentWithEnrollment,
   updateStudent,
   deleteStudent,
@@ -46,22 +44,36 @@ import Link from "next/link";
 const PAGE_SIZE = 10;
 const ALL = "__all__";
 
-export function StudentList() {
+interface StudentListProps {
+  initialStudents: StudentWithEnrollments[];
+  initialTotal: number;
+  initialLocations: Location[];
+  initialClasses: ClassWithLocation[];
+}
+
+export function StudentList({
+  initialStudents,
+  initialTotal,
+  initialLocations,
+  initialClasses,
+}: StudentListProps) {
+  const router = useRouter();
   const { searchParams, setParams } = useUrlParams("/students", ALL);
+  const [isPending, startTransition] = useTransition();
+
+  // URL é a única fonte de verdade — igual ao padrão do /finances.
   const urlSearch = searchParams.get("q") ?? "";
   const urlLocationId = searchParams.get("location") ?? ALL;
   const urlClassId = searchParams.get("class") ?? ALL;
   const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
 
-  const [isPending, startTransition] = useTransition();
+  // Props são a fonte de dados; sem useState para students/total/locations/classes.
+  const students = initialStudents;
+  const total = initialTotal;
+  const locations = initialLocations;
+  const classes = initialClasses;
 
-  // Data
-  const [students, setStudents] = useState<StudentWithEnrollments[]>([]);
-  const [total, setTotal] = useState(0);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [classes, setClasses] = useState<ClassWithLocation[]>([]);
-
-  // Dialog state
+  // Dialog & seleção — UI-only.
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] =
@@ -73,41 +85,14 @@ export function StudentList() {
   const [showDeleteBatchDialog, setShowDeleteBatchDialog] = useState(false);
   const [deletingBatch, setDeletingBatch] = useState(false);
 
-  // -- Data fetching --
-
-  useEffect(() => {
-    startTransition(async () => {
-      const [locRes, clsRes] = await Promise.all([
-        getLocations(),
-        getClassesWithLocation(),
-      ]);
-      if (locRes.success) setLocations(locRes.data);
-      if (clsRes.success) setClasses(clsRes.data);
-    });
-  }, [startTransition]);
-
-  const fetchStudents = useCallback(() => {
-    startTransition(async () => {
-      setSelectedIds([]);
-      const result = await getStudentsPaginated({
-        search: urlSearch || undefined,
-        locationId: urlLocationId !== ALL ? urlLocationId : undefined,
-        classId: urlClassId !== ALL ? urlClassId : undefined,
-        page: urlPage,
-        pageSize: PAGE_SIZE,
-      });
-      if (result.success) {
-        setStudents(result.data.students);
-        setTotal(result.data.total);
-      } else {
-        toast.error("Erro ao carregar alunas", { description: result.error });
-      }
-    });
-  }, [urlSearch, urlLocationId, urlClassId, urlPage, startTransition]);
-
-  useEffect(() => { fetchStudents(); }, [fetchStudents]);
-
-  // -- Filter handlers --
+  // Reset de seleção quando a prop `students` muda (nova página, filtro ou
+  // refresh pós-mutação). Padrão oficial React: ajuste de estado durante render
+  // — evita cascading renders que o lint react-hooks/set-state-in-effect flaga.
+  const [prevStudents, setPrevStudents] = useState(students);
+  if (prevStudents !== students) {
+    setPrevStudents(students);
+    setSelectedIds([]);
+  }
 
   const hasFilters = !!(urlSearch || urlLocationId !== ALL || urlClassId !== ALL);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -125,19 +110,28 @@ export function StudentList() {
 
   async function handleFormSubmit(formData: StudentFormData) {
     if (editingStudent) {
-      const result = await updateStudent(editingStudent.id, formDataToStudentPayload(formData));
-      if (!result.success) { toast.error("Erro ao salvar aluna", { description: result.error }); return; }
+      const result = await updateStudent(
+        editingStudent.id,
+        formDataToStudentPayload(formData)
+      );
+      if (!result.success) {
+        toast.error("Erro ao salvar aluna", { description: result.error });
+        return;
+      }
       toast.success("Aluna atualizada!");
     } else {
       const result = await createStudentWithEnrollment(
         formDataToStudentPayload(formData),
         formDataToEnrollmentPayload(formData)
       );
-      if (!result.success) { toast.error("Erro ao cadastrar aluna", { description: result.error }); return; }
+      if (!result.success) {
+        toast.error("Erro ao cadastrar aluna", { description: result.error });
+        return;
+      }
       toast.success("Aluna cadastrada e matriculada!");
     }
     setFormDialogOpen(false);
-    fetchStudents();
+    startTransition(() => router.refresh());
   }
 
   async function handleDelete(id: string) {
@@ -149,7 +143,7 @@ export function StudentList() {
     toast.success("Aluna excluída!");
     setDeleteDialogOpen(false);
     setDeletingStudent(null);
-    fetchStudents();
+    startTransition(() => router.refresh());
   }
 
   // -- Batch selection --
@@ -177,12 +171,11 @@ export function StudentList() {
     if (result.success) {
       toast.success(`${result.data.deleted} aluna(s) excluída(s).`);
       setSelectedIds([]);
-      fetchStudents();
+      startTransition(() => router.refresh());
     } else {
       toast.error("Erro ao excluir alunas", { description: result.error });
     }
   }
-
 
   const allSelected = students.length > 0 && selectedIds.length === students.length;
   const someSelected = selectedIds.length > 0;

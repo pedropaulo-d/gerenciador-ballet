@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import type { MonthlyFeeWithDetails, Location, ClassWithLocation } from "@/types/database";
+import type {
+  MonthlyFeeWithDetails,
+  Location,
+  ClassWithLocation,
+} from "@/types/database";
 import {
-  getFinancialByMonth,
   generateFeesForMonth,
   payFeeManually,
   undoPayment,
   deleteMonthlyFees,
   type FinancialSummary as SummaryData,
-  type FinancialFilters,
 } from "@/app/actions/financial";
-import { getLocations } from "@/app/actions/locations";
-import { getClassesWithLocation } from "@/app/actions/classes";
 import { MonthSelector } from "@/components/financial/month-selector";
 import { FinancialSummary } from "@/components/financial/financial-summary";
 import { FinancialFilters as FinancialFiltersUI } from "@/components/financial/financial-filters";
@@ -39,77 +40,49 @@ import { LoaderIcon, PlusCircleIcon, Trash2Icon } from "lucide-react";
 const PAGE_SIZE = 15;
 const ALL = "__all__";
 
-const emptySummary: SummaryData = {
-  totalGrossReceived: 0,
-  totalLocationFees: 0,
-  totalPending: 0,
-  totalOverdue: 0,
-  feesCount: 0,
-  paidCount: 0,
-};
+interface FinancesListProps {
+  fees: MonthlyFeeWithDetails[];
+  total: number;
+  summary: SummaryData;
+  locations: Location[];
+  classes: ClassWithLocation[];
+}
 
-export function FinancesList() {
+export function FinancesList({
+  fees,
+  total,
+  summary,
+  locations,
+  classes,
+}: FinancesListProps) {
+  const router = useRouter();
   const { searchParams, setParams } = useUrlParams("/finances", ALL);
   const [isPending, startTransition] = useTransition();
 
-  // URL state
+  // URL é a única fonte de verdade para busca/paginação.
   const urlMonth = searchParams.get("month") ?? getCurrentMonth();
   const urlPage = parseInt(searchParams.get("page") ?? "1", 10) || 1;
   const urlStatus = searchParams.get("status") ?? ALL;
   const urlLocationId = searchParams.get("location") ?? ALL;
   const urlClassId = searchParams.get("class") ?? ALL;
 
-  // Data
-  const [fees, setFees] = useState<MonthlyFeeWithDetails[]>([]);
-  const [total, setTotal] = useState(0);
-  const [summary, setSummary] = useState<SummaryData>(emptySummary);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [classes, setClasses] = useState<ClassWithLocation[]>([]);
+  // UI-only state (nada relacionado a fetch de dados).
   const [generating, setGenerating] = useState(false);
   const [payingFee, setPayingFee] = useState<MonthlyFeeWithDetails | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Reset de seleção quando a prop `fees` muda (nova página, filtro ou refresh
+  // pós-mutation). Padrão oficial do React para "resetar estado quando prop muda"
+  // sem useEffect — ajuste durante render evita renders em cascata.
+  const [prevFees, setPrevFees] = useState(fees);
+  if (prevFees !== fees) {
+    setPrevFees(fees);
+    setSelectedIds([]);
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  // Derive filters from URL (no state needed)
-  const filters: FinancialFilters = useMemo(() => ({
-    status: urlStatus !== ALL ? urlStatus : undefined,
-    locationId: urlLocationId !== ALL ? urlLocationId : undefined,
-    classId: urlClassId !== ALL ? urlClassId : undefined,
-  }), [urlStatus, urlLocationId, urlClassId]);
-
-  // -- Data fetching --
-
-  const fetchData = useCallback(() => {
-    startTransition(async () => {
-      setSelectedIds([]);
-      const result = await getFinancialByMonth(urlMonth, urlPage, PAGE_SIZE, filters);
-      if (result.success) {
-        setFees(result.data.fees);
-        setTotal(result.data.total);
-        setSummary(result.data.summary);
-      } else {
-        toast.error("Erro ao carregar financeiro", { description: result.error });
-      }
-    });
-  }, [urlMonth, urlPage, filters, startTransition]);
-
-  // Load filter options once
-  useEffect(() => {
-    startTransition(async () => {
-      const [locRes, clsRes] = await Promise.all([
-        getLocations(),
-        getClassesWithLocation(),
-      ]);
-      if (locRes.success) setLocations(locRes.data);
-      if (clsRes.success) setClasses(clsRes.data);
-    });
-  }, [startTransition]);
-
-  // Re-fetch when URL params change
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   // -- Handlers --
 
@@ -134,15 +107,17 @@ export function FinancesList() {
       });
     }
 
+    // Volta pra página 1 e força re-render do Server Component
+    // (revalidatePath já disparou dentro da action).
     setParams({ page: undefined });
-    fetchData();
+    startTransition(() => router.refresh());
   }
 
   async function handlePayManually(feeId: string, receivedAmount: number) {
     const result = await payFeeManually(feeId, receivedAmount);
     if (result.success) {
       toast.success("Pagamento registrado!");
-      fetchData();
+      startTransition(() => router.refresh());
     } else {
       toast.error("Erro ao registrar pagamento", { description: result.error });
     }
@@ -152,7 +127,7 @@ export function FinancesList() {
     const result = await undoPayment(feeId);
     if (result.success) {
       toast.success("Pagamento desfeito!");
-      fetchData();
+      startTransition(() => router.refresh());
     } else {
       toast.error("Erro ao desfazer pagamento", { description: result.error });
     }
@@ -181,12 +156,11 @@ export function FinancesList() {
     if (result.success) {
       toast.success(`${result.data.deleted} mensalidade(s) excluída(s).`);
       setSelectedIds([]);
-      fetchData();
+      startTransition(() => router.refresh());
     } else {
       toast.error("Erro ao excluir mensalidades", { description: result.error });
     }
   }
-
 
   const allSelected = fees.length > 0 && selectedIds.length === fees.length;
   const someSelected = selectedIds.length > 0;

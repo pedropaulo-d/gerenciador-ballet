@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Location, ClassWithLocation } from "@/types/database";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -14,6 +13,7 @@ import {
 import { SearchIcon } from "lucide-react";
 
 const ALL = "__all__";
+const SEARCH_DEBOUNCE_MS = 300;
 
 interface StudentFiltersProps {
   search: string;
@@ -37,38 +37,46 @@ export function StudentFilters({
   onClassChange,
 }: StudentFiltersProps) {
   const [searchInput, setSearchInput] = useState(search);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync when URL changes externally (browser back)
+  // Mantém o input em sincronia quando a URL muda externamente (voltar do
+  // browser, reset de filtros, etc).
   useEffect(() => {
     setSearchInput(search);
   }, [search]);
+
+  // Limpa qualquer timeout pendente no unmount.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const filteredClasses =
     locationId !== ALL
       ? classes.filter((c) => c.location_id === locationId)
       : classes;
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    onSearchChange(searchInput.trim());
+  function handleChange(value: string) {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const normalized = value.trim();
+      if (normalized !== search) onSearchChange(normalized);
+    }, SEARCH_DEBOUNCE_MS);
   }
 
   return (
     <>
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative flex-1">
-          <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, responsável, telefone ou CPF..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <Button type="submit" variant="secondary" size="sm">
-          Buscar
-        </Button>
-      </form>
+      <div className="relative">
+        <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nome, responsável, telefone ou CPF..."
+          value={searchInput}
+          onChange={(e) => handleChange(e.target.value)}
+          className="pl-8"
+        />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Select value={locationId} onValueChange={onLocationChange}>
