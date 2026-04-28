@@ -58,32 +58,48 @@ async function resolveRole(claims: JWTPayload): Promise<'admin' | 'teacher'> {
 }
 
 export async function middleware(request: NextRequest) {
+  const totalStart = performance.now();
   const { pathname } = request.nextUrl;
 
   const { supabase, response } = createMiddlewareClient(request);
   const { data: { session } } = await supabase.auth.getSession();
+
+  const jwtStart = performance.now();
   const claims = await verifyAccessToken(session?.access_token);
+  const jwtMs = performance.now() - jwtStart;
 
-  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
-    return response;
-  }
+  let roleMs = 0;
 
-  if (!claims) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
-  }
+  try {
+    if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+      return response;
+    }
 
-  if (ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
-    const role = await resolveRole(claims);
-    if (role !== 'admin') {
+    if (!claims) {
       const url = request.nextUrl.clone();
-      url.pathname = '/';
+      url.pathname = '/login';
       return NextResponse.redirect(url);
     }
-  }
 
-  return response;
+    if (ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
+      const roleStart = performance.now();
+      const role = await resolveRole(claims);
+      roleMs = performance.now() - roleStart;
+      if (role !== 'admin') {
+        const url = request.nextUrl.clone();
+        url.pathname = '/';
+        return NextResponse.redirect(url);
+      }
+    }
+
+    return response;
+  } finally {
+    const totalMs = performance.now() - totalStart;
+    console.log(
+      `[PERF] Middleware ${pathname}: ${totalMs.toFixed(2)} ms ` +
+      `(jwt=${jwtMs.toFixed(2)}ms, role=${roleMs.toFixed(2)}ms)`
+    );
+  }
 }
 
 export const config = {

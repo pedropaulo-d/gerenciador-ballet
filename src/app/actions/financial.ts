@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
+import { startPerf } from "@/lib/perf";
 
 const supabase = getServiceSupabase();
 import type { MonthlyFeeWithDetails } from "@/types/database";
@@ -87,6 +88,7 @@ export async function getFinancialByMonth(
   pageSize = 15,
   filters?: FinancialFilters
 ): Promise<ActionResult<FinancialPageData>> {
+  const endPerf = startPerf("getFinancialByMonth");
   try {
     await requireAdmin();
 
@@ -170,6 +172,8 @@ export async function getFinancialByMonth(
     };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao buscar dados financeiros." };
+  } finally {
+    endPerf();
   }
 }
 

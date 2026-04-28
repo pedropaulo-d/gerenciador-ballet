@@ -13,12 +13,10 @@ import {
   Trash2Icon,
   MapPinIcon,
   BanknoteIcon,
-  LoaderIcon,
 } from "lucide-react";
 
 interface LocationsTableProps {
   locations: Location[];
-  loading: boolean;
   onEdit: (location: Location) => void;
   onDelete: (location: Location) => void;
   onCreateFirst: () => void;
@@ -26,19 +24,10 @@ interface LocationsTableProps {
 
 export function LocationsTable({
   locations,
-  loading,
   onEdit,
   onDelete,
   onCreateFirst,
 }: LocationsTableProps) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   if (locations.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">

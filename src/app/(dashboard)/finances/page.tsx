@@ -8,6 +8,8 @@ import {
 import { getCurrentMonth } from "@/lib/formatters";
 import { FinancesList } from "./finances-list";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 15;
 const ALL = "__all__";
 

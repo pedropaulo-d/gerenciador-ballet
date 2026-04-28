@@ -14,12 +14,10 @@ import {
   GraduationCapIcon,
   ClockIcon,
   MapPinIcon,
-  LoaderIcon,
 } from "lucide-react";
 
 interface ClassesTableProps {
   classes: ClassWithLocation[];
-  loading: boolean;
   hasLocationFilter: boolean;
   onEdit: (cls: ClassWithLocation) => void;
   onDelete: (cls: ClassWithLocation) => void;
@@ -28,20 +26,11 @@ interface ClassesTableProps {
 
 export function ClassesTable({
   classes,
-  loading,
   hasLocationFilter,
   onEdit,
   onDelete,
   onCreateFirst,
 }: ClassesTableProps) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   if (classes.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">

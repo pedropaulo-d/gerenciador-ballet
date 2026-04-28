@@ -10,6 +10,10 @@ import { getTodayBirthdays } from "@/app/actions/dashboard";
 import { getCurrentMonth, todayISO } from "@/lib/formatters";
 import { DashboardHome } from "./dashboard-home";
 
+// Rotas privadas dependem de cookies (auth) + dados que mudam por requisição.
+// Forçar dynamic evita o Next tentar prerender estaticamente em build.
+export const dynamic = "force-dynamic";
+
 const emptySummary: FinancialSummary = {
   totalGrossReceived: 0,
   totalLocationFees: 0,

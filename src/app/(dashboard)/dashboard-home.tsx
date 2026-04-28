@@ -43,10 +43,9 @@ export function DashboardHome({
         locationsCount={locationsCount}
         classesCount={classesCount}
         absencesToday={absencesToday}
-        isPending={false}
       />
 
-      {isAdmin && <DashboardFinancial summary={summary} isPending={false} />}
+      {isAdmin && <DashboardFinancial summary={summary} />}
     </div>
   );
 }

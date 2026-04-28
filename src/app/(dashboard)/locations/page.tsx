@@ -1,5 +1,14 @@
+import { getLocations } from "@/app/actions/locations";
 import { LocationList } from "./location-list";
 
-export default function LocationsPage() {
-  return <LocationList />;
+export const dynamic = "force-dynamic";
+
+export default async function LocationsPage() {
+  const locRes = await getLocations();
+
+  return (
+    <LocationList
+      initialLocations={locRes.success ? locRes.data : []}
+    />
+  );
 }

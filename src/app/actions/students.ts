@@ -6,6 +6,7 @@ import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
+import { startPerf } from "@/lib/perf";
 
 const supabase = getServiceSupabase();
 import type {
@@ -67,6 +68,7 @@ export async function getStudentsPaginated(
   const { search, locationId, classId, page = 1, pageSize = 10 } = filters;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+  const endPerf = startPerf("getStudentsPaginated");
 
   try {
     await requireAuth();
@@ -155,6 +157,8 @@ export async function getStudentsPaginated(
     };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao buscar alunas." };
+  } finally {
+    endPerf();
   }
 }
 

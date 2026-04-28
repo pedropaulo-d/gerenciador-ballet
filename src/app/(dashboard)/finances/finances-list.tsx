@@ -57,7 +57,7 @@ export function FinancesList({
 }: FinancesListProps) {
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams("/finances", ALL);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // URL é a única fonte de verdade para busca/paginação.
   const urlMonth = searchParams.get("month") ?? getCurrentMonth();
@@ -201,9 +201,9 @@ export function FinancesList({
         onClassChange={(v) => setParams({ class: v })}
       />
 
-      {!isPending && <FinancialSummary summary={summary} />}
+      <FinancialSummary summary={summary} />
 
-      {!isPending && fees.length > 0 && (
+      {fees.length > 0 && (
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <Checkbox
@@ -228,7 +228,6 @@ export function FinancesList({
 
       <FeesTable
         fees={fees}
-        loading={isPending}
         onPayManually={setPayingFee}
         onUndoPayment={handleUndoPayment}
         selectedIds={selectedIds}

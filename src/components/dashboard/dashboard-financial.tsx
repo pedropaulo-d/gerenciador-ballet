@@ -14,10 +14,9 @@ import {
 
 interface DashboardFinancialProps {
   summary: FinancialSummary;
-  isPending: boolean;
 }
 
-export function DashboardFinancial({ summary, isPending }: DashboardFinancialProps) {
+export function DashboardFinancial({ summary }: DashboardFinancialProps) {
   return (
     <>
       <div className="rounded-xl border-2 border-primary/20 bg-card p-4 sm:p-6 shadow-sm">
@@ -34,12 +33,12 @@ export function DashboardFinancial({ summary, isPending }: DashboardFinancialPro
                 </span>
               </div>
               <p className="text-xl md:text-2xl font-semibold nums text-green-700 leading-tight tracking-tight">
-                {isPending ? "\u2014" : formatCurrency(summary.totalGrossReceived)}
+                {formatCurrency(summary.totalGrossReceived)}
               </p>
               <p className="text-xs text-muted-foreground">
-                {isPending ? "" : <><span className="nums font-medium">{summary.paidCount}</span> de <span className="nums font-medium">{summary.feesCount}</span></>}
+                <span className="nums font-medium">{summary.paidCount}</span> de <span className="nums font-medium">{summary.feesCount}</span>
               </p>
-              {!isPending && summary.totalLocationFees > 0 && (
+              {summary.totalLocationFees > 0 && (
                 <p className="text-xs text-muted-foreground">
                   Repasses provisionados: <span className="nums font-medium">{formatCurrency(summary.totalLocationFees)}</span>
                 </p>
@@ -56,7 +55,7 @@ export function DashboardFinancial({ summary, isPending }: DashboardFinancialPro
                 </span>
               </div>
               <p className="text-xl md:text-2xl font-semibold nums text-yellow-700 leading-tight tracking-tight">
-                {isPending ? "\u2014" : formatCurrency(summary.totalPending)}
+                {formatCurrency(summary.totalPending)}
               </p>
             </CardContent>
           </Card>
@@ -70,7 +69,7 @@ export function DashboardFinancial({ summary, isPending }: DashboardFinancialPro
                 </span>
               </div>
               <p className="text-xl md:text-2xl font-semibold nums text-red-600 leading-tight tracking-tight">
-                {isPending ? "\u2014" : formatCurrency(summary.totalOverdue)}
+                {formatCurrency(summary.totalOverdue)}
               </p>
             </CardContent>
           </Card>

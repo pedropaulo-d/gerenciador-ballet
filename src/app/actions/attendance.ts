@@ -6,6 +6,7 @@ import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
+import { startPerf } from "@/lib/perf";
 
 const supabase = getServiceSupabase();
 import type { AttendanceRow, AttendanceStatus } from "@/types/database";
@@ -47,6 +48,7 @@ export async function getAttendanceByClassAndDate(
   classId: string,
   date: string
 ): Promise<ActionResult<AttendanceRow[]>> {
+  const endPerf = startPerf("getAttendanceByClassAndDate");
   try {
     await requireAuth();
 
@@ -104,6 +106,8 @@ export async function getAttendanceByClassAndDate(
     return { success: true, data: rows };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao buscar chamada." };
+  } finally {
+    endPerf();
   }
 }
 

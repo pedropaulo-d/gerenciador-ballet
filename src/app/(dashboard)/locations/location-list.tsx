@@ -1,40 +1,40 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Location } from "@/types/database";
 import {
-  getLocations,
   createLocation,
   updateLocation,
   deleteLocation,
 } from "@/app/actions/locations";
-import { formDataToPayload, type LocationFormData } from "@/components/locations/location-form";
+import {
+  formDataToPayload,
+  type LocationFormData,
+} from "@/components/locations/location-form";
 import { LocationsTable } from "@/components/locations/locations-table";
 import { LocationFormDialog } from "@/components/locations/location-form-dialog";
 import { DeleteDialog } from "@/components/ui/delete-dialog";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 
-export function LocationList() {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [isPending, startTransition] = useTransition();
+interface LocationListProps {
+  initialLocations: Location[];
+}
 
-  // Dialog state
+export function LocationList({ initialLocations }: LocationListProps) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
+  // Props são a fonte de dados — sem useState/useEffect para fetch.
+  const locations = initialLocations;
+
+  // Dialog & UI-only state.
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(null);
-
-  const fetchLocations = useCallback(() => {
-    startTransition(async () => {
-      const result = await getLocations();
-      if (result.success) setLocations(result.data);
-      else toast.error("Erro ao carregar locais", { description: result.error });
-    });
-  }, [startTransition]);
-
-  useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
   // -- CRUD handlers --
 
@@ -56,7 +56,7 @@ export function LocationList() {
 
     toast.success(editingLocation ? "Local atualizado!" : "Local cadastrado!");
     setFormDialogOpen(false);
-    fetchLocations();
+    startTransition(() => router.refresh());
   }
 
   async function handleDelete(id: string) {
@@ -68,7 +68,7 @@ export function LocationList() {
     toast.success("Local excluído!");
     setDeleteDialogOpen(false);
     setDeletingLocation(null);
-    fetchLocations();
+    startTransition(() => router.refresh());
   }
 
   // -- Render --
@@ -76,7 +76,9 @@ export function LocationList() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-shadow-gold">Locais</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-shadow-gold">
+          Locais
+        </h1>
         <Button onClick={openCreate} size="sm">
           <PlusIcon data-icon="inline-start" />
           Novo Local
@@ -85,9 +87,14 @@ export function LocationList() {
 
       <LocationsTable
         locations={locations}
-        loading={isPending}
-        onEdit={(loc) => { setEditingLocation(loc); setFormDialogOpen(true); }}
-        onDelete={(loc) => { setDeletingLocation(loc); setDeleteDialogOpen(true); }}
+        onEdit={(loc) => {
+          setEditingLocation(loc);
+          setFormDialogOpen(true);
+        }}
+        onDelete={(loc) => {
+          setDeletingLocation(loc);
+          setDeleteDialogOpen(true);
+        }}
         onCreateFirst={openCreate}
       />
 

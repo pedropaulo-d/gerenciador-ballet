@@ -3,6 +3,8 @@ import { getClassesWithLocation } from "@/app/actions/classes";
 import { getStudentsPaginated } from "@/app/actions/students";
 import { StudentList } from "./student-list";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 10;
 const ALL = "__all__";
 

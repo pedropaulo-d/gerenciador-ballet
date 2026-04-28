@@ -16,14 +16,12 @@ import {
   GraduationCapIcon,
   MapPinIcon,
   PhoneIcon,
-  LoaderIcon,
   SearchIcon,
   EyeIcon,
 } from "lucide-react";
 
 interface StudentsTableProps {
   students: StudentWithEnrollments[];
-  loading: boolean;
   hasFilters: boolean;
   onEdit: (student: StudentWithEnrollments) => void;
   onDelete: (student: StudentWithEnrollments) => void;
@@ -35,7 +33,6 @@ interface StudentsTableProps {
 
 export function StudentsTable({
   students,
-  loading,
   hasFilters,
   onEdit,
   onDelete,
@@ -44,14 +41,6 @@ export function StudentsTable({
   selectedIds,
   onToggleSelect,
 }: StudentsTableProps) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   if (students.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">

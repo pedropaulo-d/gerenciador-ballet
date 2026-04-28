@@ -59,7 +59,7 @@ export function StudentList({
 }: StudentListProps) {
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams("/students", ALL);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // URL é a única fonte de verdade — igual ao padrão do /finances.
   const urlSearch = searchParams.get("q") ?? "";
@@ -211,13 +211,11 @@ export function StudentList({
         onClassChange={(v) => setParams({ class: v })}
       />
 
-      {!isPending && (
-        <p className="text-xs text-muted-foreground">
-          {total} {total === 1 ? "aluna encontrada" : "alunas encontradas"}
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground">
+        {total} {total === 1 ? "aluna encontrada" : "alunas encontradas"}
+      </p>
 
-      {!isPending && students.length > 0 && (
+      {students.length > 0 && (
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <Checkbox
@@ -242,7 +240,6 @@ export function StudentList({
 
       <StudentsTable
         students={students}
-        loading={isPending}
         hasFilters={hasFilters}
         onEdit={(s) => { setEditingStudent(s); setFormDialogOpen(true); }}
         onDelete={(s) => { setDeletingStudent(s); setDeleteDialogOpen(true); }}

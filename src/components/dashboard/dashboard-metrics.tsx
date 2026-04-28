@@ -12,7 +12,6 @@ interface DashboardMetricsProps {
   locationsCount: number;
   classesCount: number;
   absencesToday: number;
-  isPending: boolean;
 }
 
 const GOLD_CARD =
@@ -22,9 +21,8 @@ export function DashboardMetrics({
   locationsCount,
   classesCount,
   absencesToday,
-  isPending,
 }: DashboardMetricsProps) {
-  const hasAbsences = !isPending && absencesToday > 0;
+  const hasAbsences = absencesToday > 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -38,7 +36,7 @@ export function DashboardMetrics({
               </p>
             </div>
             <p className="text-2xl sm:text-3xl md:text-4xl font-semibold nums leading-none text-foreground">
-              {isPending ? "\u2014" : locationsCount}
+              {locationsCount}
             </p>
           </CardContent>
         </Card>
@@ -54,7 +52,7 @@ export function DashboardMetrics({
               </p>
             </div>
             <p className="text-2xl sm:text-3xl md:text-4xl font-semibold nums leading-none text-foreground">
-              {isPending ? "\u2014" : classesCount}
+              {classesCount}
             </p>
           </CardContent>
         </Card>
@@ -80,7 +78,7 @@ export function DashboardMetrics({
                 hasAbsences ? "text-red-600" : "text-foreground"
               }`}
             >
-              {isPending ? "\u2014" : absencesToday}
+              {absencesToday}
             </p>
           </CardContent>
         </Card>

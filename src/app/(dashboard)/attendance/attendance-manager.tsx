@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import type { AttendanceRow, AttendanceStatus, ClassWithLocation } from "@/types/database";
-import { getClassesWithLocation } from "@/app/actions/classes";
-import { getAttendanceByClassAndDate, saveAttendance } from "@/app/actions/attendance";
+import type {
+  AttendanceRow,
+  AttendanceStatus,
+  ClassWithLocation,
+} from "@/types/database";
+import { saveAttendance } from "@/app/actions/attendance";
 import { AttendanceList } from "@/components/attendance/attendance-list";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,100 +18,94 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { todayISO } from "@/lib/formatters";
 import { useUrlParams } from "@/lib/use-url-params";
-import { LoaderIcon } from "lucide-react";
 
 const NONE = "__none__";
 
-export function AttendanceManager() {
-  const { searchParams, setParams } = useUrlParams("/attendance", NONE);
-  const [isPending, startTransition] = useTransition();
+interface AttendanceManagerProps {
+  initialClasses: ClassWithLocation[];
+  initialRows: AttendanceRow[];
+  currentDate: string;
+  currentClassId: string;
+}
 
-  // URL state
-  const urlDate = searchParams.get("date") ?? todayISO();
-  const urlClassId = searchParams.get("class") ?? NONE;
+interface FormState {
+  values: Map<string, AttendanceStatus>;
+  justifications: Map<string, string>;
+  initialIds: Set<string>;
+}
 
-  // Data
-  const [classes, setClasses] = useState<ClassWithLocation[]>([]);
-  const [rows, setRows] = useState<AttendanceRow[]>([]);
-  const [values, setValues] = useState<Map<string, AttendanceStatus>>(new Map());
-  const [justifications, setJustifications] = useState<Map<string, string>>(new Map());
-  const [initialIds, setInitialIds] = useState<Set<string>>(new Set());
+function buildFormState(rows: AttendanceRow[]): FormState {
+  const values = new Map<string, AttendanceStatus>();
+  const justifications = new Map<string, string>();
+  for (const r of rows) {
+    if (r.status) values.set(r.enrollmentId, r.status);
+    if (r.justification) justifications.set(r.enrollmentId, r.justification);
+  }
+  return {
+    values,
+    justifications,
+    initialIds: new Set(values.keys()),
+  };
+}
+
+export function AttendanceManager({
+  initialClasses,
+  initialRows,
+  currentDate,
+  currentClassId,
+}: AttendanceManagerProps) {
+  const router = useRouter();
+  const { setParams } = useUrlParams("/attendance", NONE);
+  const [, startTransition] = useTransition();
+
+  // Props are the source of data — no useEffect/useState fetch.
+  const classes = initialClasses;
+  const rows = initialRows;
+
+  // Reset form state when `initialRows` muda (mudou a data/turma na URL ou
+  // chegou um refresh pós-mutation). Padrão "adjust state during render"
+  // — evita cascading renders do useEffect.
+  const [prevRows, setPrevRows] = useState(initialRows);
+  const [state, setState] = useState<FormState>(() => buildFormState(initialRows));
+  if (prevRows !== initialRows) {
+    setPrevRows(initialRows);
+    setState(buildFormState(initialRows));
+  }
+  const { values, justifications, initialIds } = state;
+
   const [saving, setSaving] = useState(false);
 
-  // Load class options
-  useEffect(() => {
-    startTransition(async () => {
-      const res = await getClassesWithLocation();
-      if (res.success) setClasses(res.data);
-    });
-  }, [startTransition]);
+  // -- Handlers (form state only) --
 
-  // Fetch attendance when class or date changes
-  const fetchAttendance = useCallback(() => {
-    startTransition(async () => {
-      if (urlClassId === NONE) {
-        setRows([]);
-        setValues(new Map());
-        setJustifications(new Map());
-        setInitialIds(new Set());
-        return;
-      }
-      const result = await getAttendanceByClassAndDate(urlClassId, urlDate);
-      if (result.success) {
-        setRows(result.data);
-        const initialValues = new Map<string, AttendanceStatus>();
-        const initialJustifications = new Map<string, string>();
-        for (const row of result.data) {
-          if (row.status) initialValues.set(row.enrollmentId, row.status);
-          if (row.justification) initialJustifications.set(row.enrollmentId, row.justification);
-        }
-        setValues(initialValues);
-        setJustifications(initialJustifications);
-        setInitialIds(new Set(initialValues.keys()));
-      } else {
-        toast.error("Erro ao carregar chamada", { description: result.error });
-      }
-    });
-  }, [urlClassId, urlDate, startTransition]);
-
-  useEffect(() => { fetchAttendance(); }, [fetchAttendance]);
-
-  // Handlers
   function handleStatusChange(enrollmentId: string, status: AttendanceStatus) {
-    setValues((prev) => {
-      const next = new Map(prev);
-      if (next.get(enrollmentId) === status) {
-        next.delete(enrollmentId);
+    setState((prev) => {
+      const nextValues = new Map(prev.values);
+      if (nextValues.get(enrollmentId) === status) {
+        nextValues.delete(enrollmentId);
       } else {
-        next.set(enrollmentId, status);
+        nextValues.set(enrollmentId, status);
       }
-      return next;
+      let nextJustifications = prev.justifications;
+      if (status !== "justified") {
+        const j = new Map(prev.justifications);
+        j.delete(enrollmentId);
+        nextJustifications = j;
+      }
+      return { ...prev, values: nextValues, justifications: nextJustifications };
     });
-    // Clear justification when switching away from justified
-    if (status !== "justified") {
-      setJustifications((prev) => {
-        const next = new Map(prev);
-        next.delete(enrollmentId);
-        return next;
-      });
-    }
   }
 
   function handleJustificationChange(enrollmentId: string, text: string) {
-    setJustifications((prev) => {
-      const next = new Map(prev);
-      if (text) {
-        next.set(enrollmentId, text);
-      } else {
-        next.delete(enrollmentId);
-      }
-      return next;
+    setState((prev) => {
+      const j = new Map(prev.justifications);
+      if (text) j.set(enrollmentId, text);
+      else j.delete(enrollmentId);
+      return { ...prev, justifications: j };
     });
   }
 
-  // Detect removals: enrollments that had a saved status but were cleared
+  // Removals: enrollments that had a saved status but were cleared in the form.
   const removals = [...initialIds].filter((id) => !values.has(id));
   const hasChanges = values.size > 0 || removals.length > 0;
 
@@ -115,17 +113,19 @@ export function AttendanceManager() {
     const records = Array.from(values.entries()).map(([enrollmentId, status]) => ({
       enrollmentId,
       status,
-      justification: status === "justified" ? (justifications.get(enrollmentId) ?? null) : null,
+      justification:
+        status === "justified" ? (justifications.get(enrollmentId) ?? null) : null,
     }));
 
     setSaving(true);
-    const result = await saveAttendance(urlDate, records, removals);
+    const result = await saveAttendance(currentDate, records, removals);
     setSaving(false);
 
     if (result.success) {
       toast.success("Chamada salva!");
-      // Update initial state to reflect saved changes
-      setInitialIds(new Set(values.keys()));
+      // Refresh do RSC — props chegam atualizadas e o "adjust during render"
+      // ressincroniza o form state com o que está persistido.
+      startTransition(() => router.refresh());
     } else {
       toast.error("Erro ao salvar chamada", { description: result.error });
     }
@@ -138,11 +138,11 @@ export function AttendanceManager() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           type="date"
-          value={urlDate}
+          value={currentDate}
           onChange={(e) => setParams({ date: e.target.value || undefined })}
         />
         <Select
-          value={urlClassId}
+          value={currentClassId}
           onValueChange={(v) => setParams({ class: v })}
         >
           <SelectTrigger className="w-full">
@@ -159,23 +159,17 @@ export function AttendanceManager() {
         </Select>
       </div>
 
-      {isPending ? (
-        <div className="flex items-center justify-center py-12">
-          <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <AttendanceList
-          rows={rows}
-          values={values}
-          justifications={justifications}
-          onStatusChange={handleStatusChange}
-          onJustificationChange={handleJustificationChange}
-          onSave={handleSave}
-          saving={saving}
-          hasClass={urlClassId !== NONE}
-          hasChanges={hasChanges}
-        />
-      )}
+      <AttendanceList
+        rows={rows}
+        values={values}
+        justifications={justifications}
+        onStatusChange={handleStatusChange}
+        onJustificationChange={handleJustificationChange}
+        onSave={handleSave}
+        saving={saving}
+        hasClass={currentClassId !== NONE}
+        hasChanges={hasChanges}
+      />
     </div>
   );
 }

@@ -31,23 +31,14 @@ const STATUS_CONFIG: Record<
 
 interface FeesTableProps {
   fees: MonthlyFeeWithDetails[];
-  loading: boolean;
   onPayManually?: (fee: MonthlyFeeWithDetails) => void;
   onUndoPayment?: (feeId: string) => Promise<void>;
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
 }
 
-export function FeesTable({ fees, loading, onPayManually, onUndoPayment, selectedIds, onToggleSelect }: FeesTableProps) {
+export function FeesTable({ fees, onPayManually, onUndoPayment, selectedIds, onToggleSelect }: FeesTableProps) {
   const [undoingId, setUndoingId] = useState<string | null>(null);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   if (fees.length === 0) {
     return (

@@ -1,146 +1,117 @@
-# Petit Allegro Manager
+# Petit Allegro Manager — Manual de Arquitetura
 
-Sistema de gestao para escola de ballet itinerante (creches e escolas parceiras).
-V2 em producao (Auth + RBAC). V1 desde abril 2026.
+Sistema de gestao para escola de ballet itinerante. V2 em producao (Auth + RBAC).
+Este arquivo dita COMO o codigo deve ser escrito. Padroes anteriores (client fetching, useEffect para dados, cascata de requests) estao DEPRECADOS — qualquer sugestao nesse formato deve ser recusada.
 
 ## Stack
 
-- **Framework:** Next.js 16 (App Router) + React 19 + TypeScript 5
-- **UI:** Tailwind CSS 4 + shadcn/ui 4 (Radix) + Zod 4
-- **Backend:** Supabase (PostgreSQL, Auth, RLS, `@supabase/ssr`)
-- **Integracoes:** API Asaas (webhooks de pagamento)
-- **Alias:** `@/*` → `src/*`
+- Next.js 16 (App Router, async Server Components) + React 19 + TypeScript 5 strict
+- Tailwind CSS 4 + shadcn/ui 4 (Radix) + Zod 4
+- Supabase (PostgreSQL, Auth, RLS, `@supabase/ssr`) + `jose` (JWT verify local)
+- Asaas (webhooks de pagamento)
+- Alias `@/*` → `src/*`
 
-## Regras Visuais (Obrigatorias)
+## Regras Visuais (obrigatorias)
 
-- **Fonte unica:** Roboto (400/500/700). **Proibido** usar fontes serifadas (Playfair, Georgia, etc)
-- **Tema "Teatro Portugues":** rosa ballet (primary), ouro envelhecido (--gold), marfim quente (background)
-- **Background:** Damask SVG pattern (opacity 4%) via CSS
-- **Cards:** Bordas douradas sutis, sombras quentes
-- **Cores oklch** definidas em `globals.css` — dark mode definido no CSS mas nao ativado
-- **Mobile-first obrigatorio:** grids fluidos, modais com `max-h` + `overflow-y-auto`
-- Componentes Radix/shadcn exigem tags de acessibilidade (ex: `SheetTitle` invisivel se necessario)
+- Fonte unica: Roboto (400/500/700). PROIBIDO serifadas (Playfair, Georgia, etc)
+- Tema "Teatro Portugues": rosa ballet (primary), ouro envelhecido (--gold), marfim (background)
+- Damask SVG pattern (opacity 4%) no background; cards com bordas douradas
+- Cores `oklch` em `globals.css`. Dark mode definido mas nao ativado
+- Mobile-first: grids fluidos, modais com `max-h` + `overflow-y-auto`
+- Radix/shadcn exigem tags de acessibilidade (ex: `SheetTitle` invisivel se necessario)
 
-## Arquitetura
+## Auth & RBAC (regras estritas)
+
+- Middleware (`src/middleware.ts`) valida JWT LOCALMENTE via `jose.jwtVerify` + `createRemoteJWKSet` em escopo de modulo (cache JWKS preservado entre requests)
+- Role lida de `claims.app_metadata.role` — ZERO chamadas a Supabase no hot path. Fallback a `profiles` existe APENAS para tokens emitidos antes da trigger de sync (legacy)
+- 3 clientes Supabase, NUNCA misturar:
+  - `createClient()` (`supabase-server.ts`) — SSR (anon + cookies, auth.getUser())
+  - `getServiceSupabase()` (`supabase.ts`) — service_role para queries em Server Actions
+  - `createMiddlewareClient()` (`supabase-middleware.ts`) — refresh de sessao no middleware
+- Server Actions chamam `requireAuth()` ou `requireAdmin()` antes de qualquer query
+- Roles: `admin` (total) / `teacher` (Home sem metricas financeiras, Alunas sem financeiro, Chamadas)
+- Teacher BLOQUEADO em `/finances`, `/locations`, `/classes`, `/admin`
+- Default ao criar usuario: `teacher` (seguranca por padrao)
+
+## Data Fetching — Pure SSR (OBRIGATORIO)
+
+- PROIBIDO `useEffect` + `useState` para buscar dados em client component
+- PROIBIDO cascata client-side (mount → fetch → setState → render → fetch)
+- `page.tsx` e SEMPRE async Server Component:
+  - Le `searchParams` (Promise no Next 16: `const sp = await searchParams`)
+  - Chama Server Actions em paralelo via `Promise.all`
+  - Passa dados como `initialX` / `currentX` props ao Client Component
+- URL e a UNICA FONTE DE VERDADE para filtros/paginacao/busca. Usar `useUrlParams` hook + `setParams({key: value})`
+- Sentinelas para "vazio": `__all__`, `__none__` (resolvidos no Server Component, nunca enviados ao banco)
+- `loading.tsx` por rota com skeleton — Suspense durante transicao de URL
+- Toda pagina privada em `(dashboard)/` declara `export const dynamic = "force-dynamic"` (depende de cookies/auth)
+
+## Mutacoes
+
+- Server Actions retornam `ActionResult<T>` (`{success: true, data}` | `{success: false, error}`)
+- Validacao Zod com `safeParse`; use `.strict()` em update partials para evitar mass-assignment
+- Try/catch em toda action; fallback `handleAuthError(e)`; erros de DB via `safeDbError()`
+- Action chama `revalidatePath()` ao final
+- Cliente, apos sucesso, faz `startTransition(() => router.refresh())` — NADA de refetch manual ou state-copy
+- Toasts (`sonner`) em toda operacao de escrita: `toast.success` / `toast.error`
+
+## Estado no Cliente
+
+- Client Component recebe dados como `initialX` props e usa direto (`const items = initialItems`)
+- PROIBIDO copiar props para `useState` para "manter dados em cache"
+- Reset de estado quando prop muda (selecao bulk-delete, form de chamada) — padrao oficial React "adjust state during render":
+  - `const [prev, setPrev] = useState(prop); if (prev !== prop) { setPrev(prop); setLocal(...); }`
+  - PROIBIDO `useEffect` para esse reset (viola `react-hooks/set-state-in-effect`)
+- `useTransition` mantido SO para feedback de mutacao (botoes "salvando...", "excluindo...")
+- Loadings de fetch (`loading={isPending}` em tabelas, `!isPending && ...` gates) ja foram removidos — nao reintroduzir
+
+## Observabilidade
+
+- Logs `[PERF]` via `startPerf(name)` em `src/lib/perf.ts` — `performance.now()` + `console.log` puro
+- Instrumentado em: `middleware.ts` (com sub-medicoes jwt/role), `getStudentsPaginated`, `getFinancialByMonth`, `getAttendanceByClassAndDate`
+- Padrao: `try { ... } finally { endPerf(); }` cobre sucesso, erro de validacao e excecoes
+- PROIBIDO adicionar APMs externos (Datadog, Sentry, Winston) sem aprovacao explicita
+- NAO instrumentar CRUDs minimos nem client components
+
+## Banco (7 tabelas)
+
+`profiles`, `locations`, `classes`, `students`, `enrollments`, `monthly_fees`, `attendance`. Trigger auto-cria profile com role default `teacher`. Trigger sincroniza `role` para `app_metadata` do JWT. Alteracoes de schema: atualizar `supabase/schema.sql` + `types/database.ts` simultaneamente.
+
+Regras de negocio: cada local cobra taxa fixa/aluna; matriculas active/inactive/pending com `due_day` 5 ou 7; `monthly_fees.net_amount = gross - asaas_fee - location_fee`; webhook Asaas dispara `PAYMENT_RECEIVED/CONFIRMED/OVERDUE/DELETED/REFUNDED`; chamada com 3 status (present/absent/justified) via upsert em lote.
+
+## Estrutura
 
 ```
 src/
 ├── app/
-│   ├── actions/               # Server Actions ("use server") — retornam ActionResult<T>
-│   │   ├── auth.ts            # signIn, signOut, getUserProfile
-│   │   ├── locations.ts       # CRUD locations
-│   │   ├── classes.ts         # CRUD classes (filtro por location)
-│   │   ├── students.ts        # CRUD students + enrollment + busca paginada
-│   │   ├── financial.ts       # Mensalidades: listagem, geracao lote, baixa, undo, overdue
-│   │   ├── attendance.ts      # Chamada: busca turma+data, upsert lote
-│   │   ├── student-profile.ts # Perfil 360 + getTodayAbsencesCount (RBAC)
-│   │   ├── dashboard.ts       # getTodayBirthdays, metricas
-│   │   └── import-students.ts # Importacao CSV com matching fuzzy
-│   ├── api/webhooks/asaas/    # Webhook POST Asaas (token validation)
-│   ├── login/                 # Tela de login (Zod validation)
-│   └── (dashboard)/           # Route group (header + bottom nav + sheet "Mais")
+│   ├── actions/         # "use server", ActionResult<T>, requireAuth/Admin
+│   ├── api/webhooks/    # webhook Asaas (token validation)
+│   ├── login/           # publico
+│   └── (dashboard)/     # privado, force-dynamic, header + bottom nav + sheet "Mais"
 ├── components/
-│   ├── ui/                    # shadcn/ui (avatar, badge, button, card, dialog, dropdown-menu, etc)
-│   ├── user-nav.tsx           # Avatar + dropdown com nome/role + logout
-│   └── [modulo]/              # locations, classes, students, dashboard, financial, attendance
+│   ├── ui/              # shadcn/ui
+│   └── [modulo]/        # UI pura: props + callbacks, sem Server Actions diretas
 ├── lib/
-│   ├── supabase.ts            # anon client (browser) + getServiceSupabase() (service_role, server-only)
-│   ├── supabase-server.ts     # createClient() — SSR client (anon + cookies, @supabase/ssr)
-│   ├── supabase-middleware.ts # createMiddlewareClient() — middleware client (anon + cookies)
-│   ├── auth-guard.ts          # requireAuth(), requireAdmin(), handleAuthError()
-│   ├── user-role-context.tsx  # UserRoleProvider + useIsAdmin/useUserProfile hooks
-│   ├── action-result.ts       # ActionResult<T> type
-│   ├── formatters.ts          # Moeda, datas, labels, timezone Brasilia
-│   └── use-url-params.ts      # Hook filtros via URL search params
-├── types/database.ts          # Tipagens do banco + Insert/Update/Join types (AppRole, Profile)
-supabase/
-├── schema.sql                 # Schema SQL completo (7 tabelas, RLS, triggers, GIN)
-└── migrations/                # Migrations incrementais
+│   ├── supabase*.ts     # 3 clientes (server, service, middleware)
+│   ├── auth-guard.ts    # requireAuth, requireAdmin, handleAuthError
+│   ├── action-result.ts # ActionResult<T>
+│   ├── safe-error.ts    # safeDbError
+│   ├── perf.ts          # startPerf
+│   ├── user-role-context.tsx  # useIsAdmin, useUserProfile
+│   ├── use-url-params.ts      # URL = source of truth
+│   └── formatters.ts    # moeda, datas (timezone Brasilia)
+├── middleware.ts
+└── types/database.ts
 ```
-
-## Auth & RBAC
-
-### Tres clientes Supabase (nunca confundir)
-| Cliente | Arquivo | Uso |
-|---|---|---|
-| `createClient()` | `supabase-server.ts` | SSR: auth.getUser() em Server Actions (anon + cookies) |
-| `getServiceSupabase()` | `supabase.ts` | Server Actions: queries de dados (service_role, bypassa RLS) |
-| `createMiddlewareClient()` | `supabase-middleware.ts` | Middleware: refresh de sessao |
-
-### Fluxo de autorizacao
-1. **Middleware** (`middleware.ts`): redireciona nao-autenticados para `/login`, bloqueia rotas admin-only
-2. **auth-guard.ts**: `requireAuth()` retorna `{userId, role}`, `requireAdmin()` exige role admin
-3. **Server Actions**: chamam `requireAuth()`/`requireAdmin()` no inicio, usam `getServiceSupabase()` para dados
-4. **Client**: `UserRoleProvider` expoe `useIsAdmin()` / `useUserProfile()` para RBAC visual
-
-### Roles
-- **admin:** acesso total
-- **teacher:** acesso restrito — Home (sem metricas financeiras), Alunas (sem historico financeiro), Chamadas
-- **Teacher NAO acessa:** `/finances`, `/locations`, `/classes`, `/admin`
-- **Default ao criar usuario:** `teacher` (seguranca por padrao)
-
-## Banco de Dados (7 tabelas)
-
-| Tabela | Descricao |
-|---|---|
-| `profiles` | Extensao de auth.users. `role` (app_role: admin/teacher). Trigger auto-create |
-| `locations` | Escolas parceiras. `fee_per_student` (taxa R$/aluna) |
-| `classes` | Turmas. `days_of_week` (smallint[]) + horario. FK location |
-| `students` | Alunas + responsavel, `is_internal`, `medical_notes`, `internal_observations` |
-| `enrollments` | student <> class. Status (active/inactive/pending), `base_fee`, `due_day` (5 ou 7) |
-| `monthly_fees` | Mensalidades. `net_amount` = gross - asaas_fee - location_fee |
-| `attendance` | Chamada diaria. present/absent/justified. Unique (enrollment_id, date) |
-
-## Regras de Negocio
-
-1. Aulas em creches/escolas parceiras — cada local cobra taxa fixa/aluna
-2. Turmas pertencem a um local, multiplos dias/semana
-3. Matriculas: active/inactive/pending, validade semester/annual, due_day 5 ou 7
-4. Mensalidades geradas em lote (idempotente), overdue automatico, baixa manual + undo
-5. Webhook Asaas: PAYMENT_RECEIVED/CONFIRMED/OVERDUE/DELETED/REFUNDED
-6. Chamada mobile-first: 3 status com toggle, upsert em lote
-7. Perfil 360: dados pessoais, matricula, observacoes, financeiro, frequencia, WhatsApp
-8. Dashboard: aniversariantes, metricas (locais/turmas/faltas), resumo financeiro (admin)
-9. Status financeiro: pendente=laranja, pago=verde, vencido=vermelho, cancelado=cinza
-
-## Navegacao
-
-- **Header:** Logo "Petit Allegro" + UserNav (avatar + dropdown logout)
-- **Bottom Nav:** Inicio, Chamada, Alunas + Financeiro (admin only) + Mais
-- **Sheet "Mais":** Turmas (admin), Locais (admin), Importar Alunas
-
-## Padroes de Codigo
-
-### Server Actions (`actions/*.ts`)
-- Retornam `ActionResult<T>`, try/catch com `handleAuthError()`
-- Validacao com Zod em inputs de usuario
-- Chamam `requireAuth()` ou `requireAdmin()` antes de qualquer operacao
-- Queries via `getServiceSupabase()` (service_role)
-
-### Componentes (`components/`)
-- UI pura: props + callbacks, sem Server Actions diretas
-- Tags de acessibilidade obrigatorias em Radix/shadcn
-
-### Paginas (`(dashboard)/`)
-- Client components orquestrando estado, dialogs, actions, toasts
-- `toast.success` / `toast.error` em toda operacao de escrita
-
-### Geral
-- TypeScript strict, componentes funcionais, React Hooks
-- Alteracoes no banco: atualizar `supabase/schema.sql` + `types/database.ts`
-- Chaves via `process.env`, nunca expor service_role no client
 
 ## Comandos
 
 ```bash
-npm run dev    # Dev server
-npm run build  # Build producao
-npm run lint   # ESLint
+npm run dev    # dev server
+npm run build  # build producao
+npm run lint   # eslint
 ```
 
-## Pendencias (V3+)
+## Pendencias V3+
 
-- Dark mode (tema CSS ja definido, falta ThemeProvider)
-- PWA / Service Worker para uso offline
-- Relatorios e exportacao (PDF/Excel)
-- Notificacoes push (lembrete de aula, cobranca)
+Dark mode (ThemeProvider faltando), PWA/offline, relatorios PDF/Excel, push notifications (lembrete de aula, cobranca).
