@@ -12,8 +12,7 @@
       "Bash(xargs grep *)",
       "Bash(find src *)",
       "Bash(xargs head *)",
-      "WebSearch",
-      "WebFetch(domain:docs.asaas.com)"
+      "WebSearch"
     ]
   }
 }

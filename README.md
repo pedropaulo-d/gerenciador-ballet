@@ -10,7 +10,6 @@ Sistema de gestao para escola de ballet itinerante que atua dentro de creches e 
 | UI | Tailwind CSS 4 + shadcn/ui (Radix) — tema "Teatro Portugues", fonte Roboto |
 | Backend | Supabase (PostgreSQL, Auth, RLS) com `@supabase/ssr` |
 | Validacao | Zod 4 |
-| Pagamentos | API Asaas (webhooks) |
 
 ## Features
 
@@ -28,8 +27,7 @@ Sistema de gestao para escola de ballet itinerante que atua dentro de creches e 
 - Controle de mensalidades com geracao em lote (idempotente)
 - Baixa manual com confirmacao editavel + undo
 - Marcacao automatica de vencidos (overdue)
-- Conciliacao via webhook Asaas (PAYMENT_RECEIVED, CONFIRMED, OVERDUE, DELETED, REFUNDED)
-- Valor liquido calculado: bruto - taxa Asaas - taxa do local
+- Valor liquido calculado: bruto - taxa do local
 
 ### Gestao Escolar
 
@@ -57,7 +55,6 @@ Sistema de gestao para escola de ballet itinerante que atua dentro de creches e 
 
 - Node.js 18+
 - Projeto Supabase configurado (Auth habilitado)
-- Conta Asaas (opcional, para webhooks de pagamento)
 
 ### Variaveis de ambiente
 
@@ -68,9 +65,6 @@ Crie um arquivo `.env.local` na raiz do projeto:
 NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJ...  # anon key
 SUPABASE_SERVICE_ROLE_KEY=eyJ...                      # service_role key (server-only)
-
-# Asaas (opcional)
-ASAAS_WEBHOOK_TOKEN=seu_token_webhook
 ```
 
 > **Atencao:** a `SUPABASE_SERVICE_ROLE_KEY` nunca deve ser prefixada com `NEXT_PUBLIC_`. Ela e usada apenas no servidor.
@@ -117,7 +111,6 @@ npm run lint   # ESLint
 src/
 ├── app/
 │   ├── actions/           # Server Actions (retornam ActionResult<T>)
-│   ├── api/webhooks/      # Webhook Asaas
 │   ├── login/             # Tela de login
 │   └── (dashboard)/       # Route group principal (header + bottom nav)
 ├── components/

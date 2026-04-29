@@ -8,7 +8,6 @@ Este arquivo dita COMO o codigo deve ser escrito. Padroes anteriores (client fet
 - Next.js 16 (App Router, async Server Components) + React 19 + TypeScript 5 strict
 - Tailwind CSS 4 + shadcn/ui 4 (Radix) + Zod 4
 - Supabase (PostgreSQL, Auth, RLS, `@supabase/ssr`) + `jose` (JWT verify local)
-- Asaas (webhooks de pagamento)
 - Alias `@/*` → `src/*`
 
 ## Regras Visuais (obrigatorias)
@@ -77,7 +76,7 @@ Este arquivo dita COMO o codigo deve ser escrito. Padroes anteriores (client fet
 
 `profiles`, `locations`, `classes`, `students`, `enrollments`, `monthly_fees`, `attendance`. Trigger auto-cria profile com role default `teacher`. Trigger sincroniza `role` para `app_metadata` do JWT. Alteracoes de schema: atualizar `supabase/schema.sql` + `types/database.ts` simultaneamente.
 
-Regras de negocio: cada local cobra taxa fixa/aluna; matriculas active/inactive/pending com `due_day` 5 ou 7; `monthly_fees.net_amount = gross - asaas_fee - location_fee`; webhook Asaas dispara `PAYMENT_RECEIVED/CONFIRMED/OVERDUE/DELETED/REFUNDED`; chamada com 3 status (present/absent/justified) via upsert em lote.
+Regras de negocio: cada local cobra taxa fixa/aluna; matriculas active/inactive/pending com `due_day` 5 ou 7; `monthly_fees.net_amount` permanece como coluna gerada do schema (campos legados `asaas_fee`/`asaas_payment_id` preservados estruturalmente, mas nao usados — recebimento e 100% manual); chamada com 3 status (present/absent/justified) via upsert em lote.
 
 ## Estrutura
 
@@ -85,7 +84,6 @@ Regras de negocio: cada local cobra taxa fixa/aluna; matriculas active/inactive/
 src/
 ├── app/
 │   ├── actions/         # "use server", ActionResult<T>, requireAuth/Admin
-│   ├── api/webhooks/    # webhook Asaas (token validation)
 │   ├── login/           # publico
 │   └── (dashboard)/     # privado, force-dynamic, header + bottom nav + sheet "Mais"
 ├── components/

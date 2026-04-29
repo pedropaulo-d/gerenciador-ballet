@@ -11,7 +11,9 @@ import type {
 import {
   generateFeesForMonth,
   payFeeManually,
+  payFeesBatchManually,
   undoPayment,
+  undoPaymentsBatch,
   deleteMonthlyFees,
   type FinancialSummary as SummaryData,
 } from "@/app/actions/financial";
@@ -21,6 +23,8 @@ import { FinancialFilters as FinancialFiltersUI } from "@/components/financial/f
 import { FeesTable } from "@/components/financial/fees-table";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { PayFeeDialog } from "@/components/financial/pay-fee-dialog";
+import { BatchPaymentDialog } from "@/components/financial/batch-payment-dialog";
+import { UndoPaymentsDialog } from "@/components/financial/undo-payments-dialog";
 import { useUrlParams } from "@/lib/use-url-params";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,7 +39,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { getCurrentMonth } from "@/lib/formatters";
-import { LoaderIcon, PlusCircleIcon, Trash2Icon } from "lucide-react";
+import {
+  HandCoinsIcon,
+  LoaderIcon,
+  PlusCircleIcon,
+  Trash2Icon,
+  Undo2Icon,
+} from "lucide-react";
 
 const PAGE_SIZE = 15;
 const ALL = "__all__";
@@ -69,9 +79,15 @@ export function FinancesList({
   // UI-only state (nada relacionado a fetch de dados).
   const [generating, setGenerating] = useState(false);
   const [payingFee, setPayingFee] = useState<MonthlyFeeWithDetails | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedFees, setSelectedFees] = useState<MonthlyFeeWithDetails[]>([]);
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [showUndoDialog, setShowUndoDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Quando uma operacao em lote falha parcialmente, guardamos os IDs que NAO
+  // foram processados para que o reset de selecao (acionado pelo refresh) os
+  // preserve, permitindo retry sem selecionar tudo de novo.
+  const [pendingFailedIds, setPendingFailedIds] = useState<string[] | null>(null);
 
   // Reset de seleção quando a prop `fees` muda (nova página, filtro ou refresh
   // pós-mutation). Padrão oficial do React para "resetar estado quando prop muda"
@@ -79,8 +95,32 @@ export function FinancesList({
   const [prevFees, setPrevFees] = useState(fees);
   if (prevFees !== fees) {
     setPrevFees(fees);
-    setSelectedIds([]);
+    if (pendingFailedIds && pendingFailedIds.length > 0) {
+      const restored = fees.filter((f) => pendingFailedIds.includes(f.id));
+      setSelectedFees(restored);
+      setPendingFailedIds(null);
+    } else {
+      setSelectedFees([]);
+    }
   }
+
+  // Grupos: "pay" (pendente/vencido -> receber) e "undo" (pago -> desfazer).
+  // O lote precisa ser homogeneo, entao travamos o modo pelo primeiro item selecionado.
+  const payFees = fees.filter(
+    (f) => f.status === "pending" || f.status === "overdue",
+  );
+  const undoFees = fees.filter((f) => f.status === "paid");
+  const someSelected = selectedFees.length > 0;
+  const activeGroup: "pay" | "undo" = someSelected
+    ? selectedFees[0].status === "paid"
+      ? "undo"
+      : "pay"
+    : payFees.length > 0
+      ? "pay"
+      : "undo";
+  const groupCandidates = activeGroup === "undo" ? undoFees : payFees;
+  const selectionMode = someSelected ? activeGroup : null;
+  const selectedIds = selectedFees.map((f) => f.id);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -134,17 +174,65 @@ export function FinancesList({
   }
 
   function handleToggleSelect(id: string) {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedFees((prev) => {
+      if (prev.some((f) => f.id === id)) {
+        return prev.filter((f) => f.id !== id);
+      }
+      const fee = fees.find((f) => f.id === id);
+      if (!fee) return prev;
+      return [...prev, fee];
+    });
   }
 
   function handleToggleAll() {
-    if (selectedIds.length === fees.length) {
-      setSelectedIds([]);
+    if (
+      groupCandidates.length > 0 &&
+      selectedFees.length === groupCandidates.length
+    ) {
+      setSelectedFees([]);
     } else {
-      setSelectedIds(fees.map((f) => f.id));
+      setSelectedFees(groupCandidates);
     }
+  }
+
+  async function handlePayBatch(
+    payments: { feeId: string; amountPaid: number }[],
+    paymentDate: string,
+  ) {
+    const result = await payFeesBatchManually(payments, paymentDate);
+    if (result.success) {
+      toast.success(`${result.data.paid} mensalidade(s) recebidas!`);
+      setSelectedFees([]);
+      startTransition(() => router.refresh());
+    } else {
+      toast.error("Erro ao registrar pagamentos", { description: result.error });
+    }
+  }
+
+  async function handleUndoBatch() {
+    const result = await undoPaymentsBatch(selectedIds);
+    if (!result.success) {
+      toast.error("Erro ao desfazer pagamentos", { description: result.error });
+      return;
+    }
+
+    const { undoneIds, failedIds } = result.data;
+
+    if (undoneIds.length === 0 && failedIds.length > 0) {
+      toast.error(`Nenhum recebimento foi desfeito. ${failedIds.length} falharam.`);
+      return;
+    }
+
+    if (failedIds.length > 0) {
+      toast.warning(
+        `${undoneIds.length} desfeito(s), ${failedIds.length} falharam.`,
+      );
+      setPendingFailedIds(failedIds);
+    } else {
+      toast.success(`${undoneIds.length} recebimento(s) desfeito(s)!`);
+    }
+
+    startTransition(() => router.refresh());
   }
 
   async function handleDeleteSelected() {
@@ -155,15 +243,17 @@ export function FinancesList({
 
     if (result.success) {
       toast.success(`${result.data.deleted} mensalidade(s) excluída(s).`);
-      setSelectedIds([]);
+      setSelectedFees([]);
       startTransition(() => router.refresh());
     } else {
       toast.error("Erro ao excluir mensalidades", { description: result.error });
     }
   }
 
-  const allSelected = fees.length > 0 && selectedIds.length === fees.length;
-  const someSelected = selectedIds.length > 0;
+  const allSelected =
+    groupCandidates.length > 0 &&
+    selectedFees.length === groupCandidates.length;
+  const hasSelectable = payFees.length > 0 || undoFees.length > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -203,24 +293,49 @@ export function FinancesList({
 
       <FinancialSummary summary={summary} />
 
-      {fees.length > 0 && (
-        <div className="flex items-center gap-3">
+      {hasSelectable && (
+        <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <Checkbox
               checked={allSelected}
               onCheckedChange={handleToggleAll}
-              aria-label="Selecionar todas as mensalidades"
+              aria-label="Selecionar todas as mensalidades do grupo ativo"
             />
-            <span className="text-muted-foreground">Selecionar todas</span>
+            <span className="text-muted-foreground">
+              Selecionar todas
+              {someSelected && activeGroup === "undo" ? " (pagas)" : ""}
+            </span>
           </label>
-          {someSelected && (
+          {someSelected && activeGroup === "pay" && (
+            <>
+              <Button
+                size="sm"
+                onClick={() => setShowBatchDialog(true)}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <HandCoinsIcon className="size-3.5" />
+                Receber {selectedFees.length} Selecionada
+                {selectedFees.length === 1 ? "" : "s"}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2Icon className="size-3.5" />
+                Excluir ({selectedFees.length})
+              </Button>
+            </>
+          )}
+          {someSelected && activeGroup === "undo" && (
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
-              onClick={() => setShowDeleteDialog(true)}
+              onClick={() => setShowUndoDialog(true)}
             >
-              <Trash2Icon className="size-3.5" />
-              Excluir ({selectedIds.length})
+              <Undo2Icon className="size-3.5" />
+              Desfazer {selectedFees.length} Recebimento
+              {selectedFees.length === 1 ? "" : "s"}
             </Button>
           )}
         </div>
@@ -232,6 +347,7 @@ export function FinancesList({
         onUndoPayment={handleUndoPayment}
         selectedIds={selectedIds}
         onToggleSelect={handleToggleSelect}
+        selectionMode={selectionMode}
       />
 
       <PaginationControls
@@ -245,6 +361,20 @@ export function FinancesList({
         open={payingFee !== null}
         onOpenChange={(open) => !open && setPayingFee(null)}
         onConfirm={handlePayManually}
+      />
+
+      <BatchPaymentDialog
+        fees={selectedFees}
+        open={showBatchDialog}
+        onOpenChange={setShowBatchDialog}
+        onConfirm={handlePayBatch}
+      />
+
+      <UndoPaymentsDialog
+        fees={selectedFees}
+        open={showUndoDialog}
+        onOpenChange={setShowUndoDialog}
+        onConfirm={handleUndoBatch}
       />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

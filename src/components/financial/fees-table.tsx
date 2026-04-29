@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  BabyIcon,
   DollarSignIcon,
   GraduationCapIcon,
   MapPinIcon,
@@ -35,9 +36,14 @@ interface FeesTableProps {
   onUndoPayment?: (feeId: string) => Promise<void>;
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
+  /**
+   * Locks the selection group so the user cannot mix paid and pending/overdue
+   * in the same batch. `null` (default) = both groups enabled.
+   */
+  selectionMode?: "pay" | "undo" | null;
 }
 
-export function FeesTable({ fees, onPayManually, onUndoPayment, selectedIds, onToggleSelect }: FeesTableProps) {
+export function FeesTable({ fees, onPayManually, onUndoPayment, selectedIds, onToggleSelect, selectionMode }: FeesTableProps) {
   const [undoingId, setUndoingId] = useState<string | null>(null);
 
   if (fees.length === 0) {
@@ -68,25 +74,33 @@ export function FeesTable({ fees, onPayManually, onUndoPayment, selectedIds, onT
         const isUndoing = undoingId === fee.id;
 
         const isSelected = selectedIds?.includes(fee.id) ?? false;
+        const canSelect = canPay || canUndo;
+        const lockedByMode =
+          (selectionMode === "pay" && !canPay) ||
+          (selectionMode === "undo" && !canUndo);
 
         return (
           <Card key={fee.id} size="sm">
             <CardContent className="flex gap-3 py-5 px-5">
-              {onToggleSelect && (
+              {onToggleSelect && canSelect && (
                 <div className="flex items-start pt-1 shrink-0">
                   <Checkbox
                     checked={isSelected}
+                    disabled={lockedByMode}
                     onCheckedChange={() => onToggleSelect(fee.id)}
                     aria-label={`Selecionar mensalidade de ${student?.full_name ?? "aluna"}`}
                   />
                 </div>
               )}
               <div className="flex flex-col gap-3 min-w-0 flex-1">
-              {/* The star: student name + status badge */}
+              {/* The star: guardian (responsavel) name + status badge */}
               <div className="flex items-start justify-between gap-3">
-                <h3 className="min-w-0 truncate text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                  {student?.full_name ?? "\u2014"}
-                </h3>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                    {student?.guardian_name ?? "\u2014"}
+                  </h3>
+                  <span className="text-xs text-muted-foreground">Responsavel</span>
+                </div>
                 <Badge variant={variant} className="shrink-0 mt-1">{label}</Badge>
               </div>
 
@@ -97,6 +111,15 @@ export function FeesTable({ fees, onPayManually, onUndoPayment, selectedIds, onT
 
               {/* Supporting details */}
               <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <BabyIcon className="size-3.5 shrink-0" />
+                  <span>
+                    Aluna:{" "}
+                    <span className="font-medium text-foreground/80">
+                      {student?.full_name ?? "\u2014"}
+                    </span>
+                  </span>
+                </div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <GraduationCapIcon className="size-3.5 shrink-0" />
                   <span className="truncate max-w-[10rem] sm:max-w-none">{cls?.name ?? "\u2014"}</span>

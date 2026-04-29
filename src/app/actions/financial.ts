@@ -136,7 +136,7 @@ export async function getFinancialByMonth(
     let query = supabase
       .from("monthly_fees")
       .select(
-        "*, enrollment:enrollments(id, due_day, student:students(full_name), class:classes(name, location:locations(name)))",
+        "*, enrollment:enrollments(id, due_day, student:students(full_name, guardian_name), class:classes(name, location:locations(name)))",
         { count: "exact" }
       )
       .eq("reference_month", referenceMonth);
@@ -434,8 +434,8 @@ export async function deleteMonthlyFees(
 
 /**
  * Manual payment: mark a fee as paid with the actual received amount.
- * Sets asaas_fee to 0 (off-gateway) and updates gross_amount to reflect
- * the real value received (may differ from original due to discounts/fines).
+ * gross_amount reflects the real value received (may differ from the original
+ * due to discounts or fines applied at the moment of confirmation).
  */
 export async function payFeeManually(
   feeId: string,
@@ -468,5 +468,173 @@ export async function payFeeManually(
     return { success: true, data: null };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao registrar pagamento." };
+  }
+}
+
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data invalida.");
+const batchPaymentSchema = z
+  .array(
+    z.object({
+      feeId: uuidSchema,
+      amountPaid: positiveAmount,
+    })
+  )
+  .min(1, "Nenhum pagamento informado.")
+  .max(500, "Maximo de 500 pagamentos por vez.");
+
+/**
+ * Batch manual payment: mark multiple fees as paid, each with its own received
+ * amount. A single global paymentDate (YYYY-MM-DD) is anchored at noon Brasilia
+ * time so the date is preserved regardless of server timezone.
+ */
+export async function payFeesBatchManually(
+  payments: { feeId: string; amountPaid: number }[],
+  paymentDate: string
+): Promise<ActionResult<{ paid: number }>> {
+  try {
+    await requireAdmin();
+
+    if (!isoDateSchema.safeParse(paymentDate).success) {
+      return { success: false, error: "Data de recebimento invalida." };
+    }
+
+    const parsed = batchPaymentSchema.safeParse(payments);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Pagamentos invalidos." };
+    }
+
+    const paidAtIso = new Date(`${paymentDate}T12:00:00-03:00`).toISOString();
+
+    let paid = 0;
+    for (const p of parsed.data) {
+      const sanitized = Math.round(p.amountPaid * 100) / 100;
+      const { error } = await supabase
+        .from("monthly_fees")
+        .update({
+          status: "paid",
+          gross_amount: sanitized,
+          asaas_fee: 0,
+          paid_at: paidAtIso,
+        })
+        .eq("id", p.feeId);
+
+      if (error) {
+        return {
+          success: false,
+          error: `Falha ao registrar pagamento. ${paid} de ${parsed.data.length} confirmadas antes do erro.`,
+        };
+      }
+      paid++;
+    }
+
+    revalidatePath("/finances");
+    return { success: true, data: { paid } };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao registrar pagamentos em lote." };
+  }
+}
+
+type UndoFeeRow = {
+  id: string;
+  reference_month: string;
+  enrollment:
+    | { base_fee: number; due_day: number }
+    | { base_fee: number; due_day: number }[]
+    | null;
+};
+
+/**
+ * Batch undo: revert multiple paid fees back to pending or overdue (computed
+ * from due_day relative to the current Brasilia time). Restores gross_amount
+ * to enrollment.base_fee and clears paid_at. Continues processing on per-row
+ * errors so the caller receives a granular result split between undoneIds and
+ * failedIds — enabling the UI to keep failures selected for retry.
+ */
+export async function undoPaymentsBatch(
+  feeIds: string[]
+): Promise<ActionResult<{ undoneIds: string[]; failedIds: string[] }>> {
+  const endPerf = startPerf("undoPaymentsBatch");
+  try {
+    await requireAdmin();
+
+    if (!Array.isArray(feeIds) || feeIds.length === 0) {
+      return { success: false, error: "Nenhuma mensalidade selecionada." };
+    }
+    if (feeIds.length > 500) {
+      return { success: false, error: "Maximo de 500 mensalidades por vez." };
+    }
+    for (const id of feeIds) {
+      if (!uuidSchema.safeParse(id).success) {
+        return { success: false, error: "ID de mensalidade invalido." };
+      }
+    }
+
+    // Fetch only fees that are currently paid — defensive against stale UI
+    const { data: rows, error: fetchError } = await supabase
+      .from("monthly_fees")
+      .select("id, reference_month, enrollment:enrollments(base_fee, due_day)")
+      .in("id", feeIds)
+      .eq("status", "paid");
+
+    if (fetchError) {
+      return { success: false, error: "Falha ao buscar mensalidades." };
+    }
+
+    const found = new Map<
+      string,
+      { baseFee: number; dueDay: number; referenceMonth: string }
+    >();
+    for (const row of (rows ?? []) as UndoFeeRow[]) {
+      const e = unwrapJoin(row.enrollment);
+      if (e) {
+        found.set(row.id, {
+          baseFee: Number(e.base_fee),
+          dueDay: e.due_day,
+          referenceMonth: row.reference_month,
+        });
+      }
+    }
+
+    const now = nowBrasilia();
+    const undoneIds: string[] = [];
+    const failedIds: string[] = [];
+
+    for (const id of feeIds) {
+      const data = found.get(id);
+      if (!data) {
+        failedIds.push(id);
+        continue;
+      }
+
+      const [year, month] = data.referenceMonth.split("-").map(Number);
+      const dueDate = new Date(year, month - 1, data.dueDay, 23, 59, 59);
+      const newStatus = now > dueDate ? "overdue" : "pending";
+
+      const { error } = await supabase
+        .from("monthly_fees")
+        .update({
+          status: newStatus,
+          gross_amount: data.baseFee,
+          paid_at: null,
+          asaas_fee: 0,
+        })
+        .eq("id", id);
+
+      if (error) {
+        failedIds.push(id);
+      } else {
+        undoneIds.push(id);
+      }
+    }
+
+    if (undoneIds.length > 0) {
+      revalidatePath("/finances");
+    }
+
+    return { success: true, data: { undoneIds, failedIds } };
+  } catch (e) {
+    return handleAuthError(e) ?? { success: false, error: "Falha ao desfazer pagamentos em lote." };
+  } finally {
+    endPerf();
   }
 }
