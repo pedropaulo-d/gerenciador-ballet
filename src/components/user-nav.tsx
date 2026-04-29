@@ -34,7 +34,7 @@ export function UserNav() {
 
   if (!profile) {
     return (
-      <div className="size-8 animate-pulse rounded-full border border-gold/20 bg-muted" />
+      <div className="size-8 animate-pulse rounded-full border border-primary/20 bg-muted" />
     );
   }
 
@@ -53,7 +53,7 @@ export function UserNav() {
           type="button"
           className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Avatar className="size-8 border border-gold/30">
+          <Avatar className="size-8 border border-primary/30">
             <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
               {initials}
             </AvatarFallback>

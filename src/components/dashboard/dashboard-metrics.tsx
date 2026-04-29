@@ -14,8 +14,8 @@ interface DashboardMetricsProps {
   absencesToday: number;
 }
 
-const GOLD_CARD =
-  "border-2 border-gold/30 shadow-md shadow-gold/[0.06] transition-all hover:border-gold/50 hover:shadow-lg hover:shadow-gold/[0.1]";
+const METRIC_CARD =
+  "border-2 border-primary/30 shadow-md shadow-primary/[0.06] transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/[0.1]";
 
 export function DashboardMetrics({
   locationsCount,
@@ -27,10 +27,10 @@ export function DashboardMetrics({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <Link href="/locations">
-        <Card className={GOLD_CARD}>
+        <Card className={METRIC_CARD}>
           <CardContent className="flex items-center justify-between gap-3 py-4 px-4 sm:flex-col sm:items-center sm:justify-start sm:gap-2 sm:py-6 sm:px-3 sm:text-center">
             <div className="flex items-center gap-2.5 sm:flex-col sm:gap-2">
-              <MapPinIcon className="size-5 text-gold" />
+              <MapPinIcon className="size-5 text-primary" />
               <p className="text-base sm:text-lg font-semibold text-foreground">
                 Locais
               </p>
@@ -43,10 +43,10 @@ export function DashboardMetrics({
       </Link>
 
       <Link href="/classes">
-        <Card className={GOLD_CARD}>
+        <Card className={METRIC_CARD}>
           <CardContent className="flex items-center justify-between gap-3 py-4 px-4 sm:flex-col sm:items-center sm:justify-start sm:gap-2 sm:py-6 sm:px-3 sm:text-center">
             <div className="flex items-center gap-2.5 sm:flex-col sm:gap-2">
-              <GraduationCapIcon className="size-5 text-gold" />
+              <GraduationCapIcon className="size-5 text-primary" />
               <p className="text-base sm:text-lg font-semibold text-foreground">
                 Turmas
               </p>
@@ -62,20 +62,20 @@ export function DashboardMetrics({
         <Card
           className={
             hasAbsences
-              ? "border-2 border-red-300/60 shadow-md shadow-red-500/[0.06] transition-all hover:border-red-400/60 hover:shadow-lg"
-              : GOLD_CARD
+              ? "border-2 border-destructive/40 shadow-md shadow-destructive/[0.06] transition-all hover:border-destructive/60 hover:shadow-lg"
+              : METRIC_CARD
           }
         >
           <CardContent className="flex items-center justify-between gap-3 py-4 px-4 sm:flex-col sm:items-center sm:justify-start sm:gap-2 sm:py-6 sm:px-3 sm:text-center">
             <div className="flex items-center gap-2.5 sm:flex-col sm:gap-2">
-              <XCircleIcon className={`size-5 ${hasAbsences ? "text-red-500" : "text-gold"}`} />
+              <XCircleIcon className={`size-5 ${hasAbsences ? "text-destructive" : "text-primary"}`} />
               <p className="text-base sm:text-lg font-semibold text-foreground">
                 Faltas Hoje
               </p>
             </div>
             <p
               className={`text-2xl sm:text-3xl md:text-4xl font-semibold nums leading-none ${
-                hasAbsences ? "text-red-600" : "text-foreground"
+                hasAbsences ? "text-destructive" : "text-foreground"
               }`}
             >
               {absencesToday}

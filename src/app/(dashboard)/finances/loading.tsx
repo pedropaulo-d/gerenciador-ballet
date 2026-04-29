@@ -22,7 +22,7 @@ export default function FinancesLoading() {
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="h-24 rounded-xl border-2 border-gold/20 bg-card animate-pulse"
+            className="h-24 rounded-xl border-2 border-primary/20 bg-card animate-pulse"
           />
         ))}
       </div>
@@ -32,7 +32,7 @@ export default function FinancesLoading() {
         {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className="h-16 rounded-md border border-gold/20 bg-card animate-pulse"
+            className="h-16 rounded-md border border-primary/20 bg-card animate-pulse"
           />
         ))}
       </div>

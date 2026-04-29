@@ -10,10 +10,11 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* ─── Color Hijacking: escala amber nativa do Tailwind reescrita
-     para a paleta rosa da Petit Allegro. Componentes que usam
-     text-amber-*, bg-amber-*, border-amber-* passam a renderizar
-     na nova identidade SEM precisar abrir nenhum .tsx. ─── */
+  /* ─── Color Hijacking: escalas amber / yellow / orange nativas do Tailwind
+     reescritas para a paleta rosa da Petit Allegro. Qualquer classe
+     text-{amber,yellow,orange}-*, bg-*, border-*, shadow-* renderiza rosa
+     SEM precisar abrir nenhum .tsx. Bala de prata: torna o Tailwind
+     fisicamente incapaz de pintar amarelo/laranja em qualquer canto. ─── */
   --color-amber-50:  color-mix(in oklch, var(--secondary) 60%, white);
   --color-amber-100: var(--secondary);
   --color-amber-200: color-mix(in oklch, var(--secondary) 50%, var(--border));
@@ -25,6 +26,30 @@
   --color-amber-800: var(--secondary-foreground);
   --color-amber-900: color-mix(in oklch, var(--secondary-foreground) 75%, black);
   --color-amber-950: color-mix(in oklch, var(--secondary-foreground) 55%, black);
+
+  --color-yellow-50:  color-mix(in oklch, var(--secondary) 60%, white);
+  --color-yellow-100: var(--secondary);
+  --color-yellow-200: color-mix(in oklch, var(--secondary) 50%, var(--border));
+  --color-yellow-300: var(--border);
+  --color-yellow-400: color-mix(in oklch, var(--border) 35%, var(--primary));
+  --color-yellow-500: var(--primary);
+  --color-yellow-600: color-mix(in oklch, var(--primary) 75%, var(--secondary-foreground));
+  --color-yellow-700: color-mix(in oklch, var(--primary) 35%, var(--secondary-foreground));
+  --color-yellow-800: var(--secondary-foreground);
+  --color-yellow-900: color-mix(in oklch, var(--secondary-foreground) 75%, black);
+  --color-yellow-950: color-mix(in oklch, var(--secondary-foreground) 55%, black);
+
+  --color-orange-50:  color-mix(in oklch, var(--secondary) 60%, white);
+  --color-orange-100: var(--secondary);
+  --color-orange-200: color-mix(in oklch, var(--secondary) 50%, var(--border));
+  --color-orange-300: var(--border);
+  --color-orange-400: color-mix(in oklch, var(--border) 35%, var(--primary));
+  --color-orange-500: var(--primary);
+  --color-orange-600: color-mix(in oklch, var(--primary) 75%, var(--secondary-foreground));
+  --color-orange-700: color-mix(in oklch, var(--primary) 35%, var(--secondary-foreground));
+  --color-orange-800: var(--secondary-foreground);
+  --color-orange-900: color-mix(in oklch, var(--secondary-foreground) 75%, black);
+  --color-orange-950: color-mix(in oklch, var(--secondary-foreground) 55%, black);
 
   /* Legado "aristocraticGold" — apontando para a paleta rosa.
      Componentes que usam bg-gold / border-gold-light / text-gold-muted

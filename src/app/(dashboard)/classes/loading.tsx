@@ -15,7 +15,7 @@ export default function ClassesLoading() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="h-32 rounded-xl border border-gold/20 bg-card animate-pulse"
+            className="h-32 rounded-xl border border-primary/20 bg-card animate-pulse"
           />
         ))}
       </div>

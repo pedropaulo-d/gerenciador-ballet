@@ -157,9 +157,9 @@ export function ImportTool() {
                   className="flex items-start gap-2 py-2 border-b last:border-0"
                 >
                   {row.success ? (
-                    <CheckCircle2Icon className="size-4 shrink-0 text-green-600 mt-0.5" />
+                    <CheckCircle2Icon className="size-4 shrink-0 text-primary mt-0.5" />
                   ) : (
-                    <XCircleIcon className="size-4 shrink-0 text-red-500 mt-0.5" />
+                    <XCircleIcon className="size-4 shrink-0 text-destructive mt-0.5" />
                   )}
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm">
@@ -171,7 +171,7 @@ export function ImportTool() {
                       </span>
                     </span>
                     {row.error && (
-                      <span className="text-xs text-red-500">{row.error}</span>
+                      <span className="text-xs text-destructive">{row.error}</span>
                     )}
                   </div>
                 </div>

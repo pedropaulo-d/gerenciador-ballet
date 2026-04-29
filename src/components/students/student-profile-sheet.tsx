@@ -127,15 +127,15 @@ export function StudentProfileSheet({
                 <CardContent className="py-3">
                   <p className="mb-2 text-sm font-medium">Frequencia do mes</p>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="flex items-center gap-1 text-green-700">
+                    <span className="flex items-center gap-1 text-primary">
                       <CheckCircle2Icon className="size-3.5" />
                       <span className="text-base font-semibold nums">{data.attendance.present}</span> P
                     </span>
-                    <span className="flex items-center gap-1 text-red-700">
+                    <span className="flex items-center gap-1 text-destructive">
                       <XCircleIcon className="size-3.5" />
                       <span className="text-base font-semibold nums">{data.attendance.absent}</span> F
                     </span>
-                    <span className="flex items-center gap-1 text-yellow-700">
+                    <span className="flex items-center gap-1 text-secondary-foreground">
                       <AlertTriangleIcon className="size-3.5" />
                       <span className="text-base font-semibold nums">{data.attendance.justified}</span> J
                     </span>
@@ -184,7 +184,7 @@ export function StudentProfileSheet({
                     <p className="text-sm font-medium">Observacoes Importantes</p>
                     {data.student.medicalNotes && (
                       <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <HeartPulseIcon className="mt-0.5 size-3.5 shrink-0 text-red-500" />
+                        <HeartPulseIcon className="mt-0.5 size-3.5 shrink-0 text-destructive" />
                         <span>{data.student.medicalNotes}</span>
                       </div>
                     )}
@@ -219,7 +219,7 @@ export function StudentProfileSheet({
                         href={`https://wa.me/55${formatPhone(data.student.guardianPhone)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm text-white transition-colors hover:bg-green-700"
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
                       >
                         <MessageCircleIcon className="size-3.5 shrink-0" />
                         WhatsApp

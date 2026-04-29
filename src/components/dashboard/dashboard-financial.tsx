@@ -24,15 +24,15 @@ export function DashboardFinancial({ summary }: DashboardFinancialProps) {
           Financeiro do Mes
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card className="border-green-200/60">
+          <Card>
             <CardContent className="flex flex-col gap-2 py-5 px-4">
               <div className="flex items-center gap-1.5">
-                <CheckCircle2Icon className="size-5 text-green-600" />
-                <span className="text-lg font-semibold text-green-600">
+                <CheckCircle2Icon className="size-5 text-primary" />
+                <span className="text-lg font-semibold text-primary">
                   Recebido
                 </span>
               </div>
-              <p className="text-xl md:text-2xl font-semibold nums text-green-700 leading-tight tracking-tight">
+              <p className="text-xl md:text-2xl font-semibold nums text-primary leading-tight tracking-tight">
                 {formatCurrency(summary.totalGrossReceived)}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -46,29 +46,29 @@ export function DashboardFinancial({ summary }: DashboardFinancialProps) {
             </CardContent>
           </Card>
 
-          <Card className="border-yellow-200/60">
+          <Card>
             <CardContent className="flex flex-col gap-2 py-5 px-4">
               <div className="flex items-center gap-1.5">
-                <ClockIcon className="size-5 text-yellow-600" />
-                <span className="text-lg font-semibold text-yellow-600">
+                <ClockIcon className="size-5 text-secondary-foreground" />
+                <span className="text-lg font-semibold text-secondary-foreground">
                   Pendente
                 </span>
               </div>
-              <p className="text-xl md:text-2xl font-semibold nums text-yellow-700 leading-tight tracking-tight">
+              <p className="text-xl md:text-2xl font-semibold nums text-secondary-foreground leading-tight tracking-tight">
                 {formatCurrency(summary.totalPending)}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-red-200/60">
+          <Card>
             <CardContent className="flex flex-col gap-2 py-5 px-4">
               <div className="flex items-center gap-1.5">
-                <AlertTriangleIcon className="size-5 text-red-500" />
-                <span className="text-lg font-semibold text-red-500">
+                <AlertTriangleIcon className="size-5 text-destructive" />
+                <span className="text-lg font-semibold text-destructive">
                   Vencido
                 </span>
               </div>
-              <p className="text-xl md:text-2xl font-semibold nums text-red-600 leading-tight tracking-tight">
+              <p className="text-xl md:text-2xl font-semibold nums text-destructive leading-tight tracking-tight">
                 {formatCurrency(summary.totalOverdue)}
               </p>
             </CardContent>
@@ -77,15 +77,15 @@ export function DashboardFinancial({ summary }: DashboardFinancialProps) {
       </div>
 
       <Link href="/finances">
-        <Card className="border-2 border-gold/20 transition-all hover:border-gold/40 hover:shadow-md hover:shadow-gold/[0.06]">
+        <Card className="border-2 border-primary/20 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/[0.06]">
           <CardContent className="flex items-center justify-between py-4 px-5">
             <div className="flex items-center gap-2.5">
-              <DollarSignIcon className="size-5 text-gold" />
+              <DollarSignIcon className="size-5 text-primary" />
               <span className="text-base sm:text-xl font-semibold text-foreground">
                 Ver Financeiro Completo
               </span>
             </div>
-            <ArrowRightIcon className="size-4 text-gold-muted" />
+            <ArrowRightIcon className="size-4 text-muted-foreground" />
           </CardContent>
         </Card>
       </Link>

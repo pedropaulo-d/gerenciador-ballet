@@ -12,7 +12,7 @@ export default function DashboardLoading() {
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="h-20 sm:h-32 rounded-xl border-2 border-gold/20 bg-card animate-pulse"
+            className="h-20 sm:h-32 rounded-xl border-2 border-primary/20 bg-card animate-pulse"
           />
         ))}
       </div>

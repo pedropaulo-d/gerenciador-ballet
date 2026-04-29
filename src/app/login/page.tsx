@@ -70,7 +70,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
-      <Card className="w-full max-w-sm border-gold/20 shadow-lg">
+      <Card className="w-full max-w-sm border-primary/20 shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold tracking-tight text-shadow-gold">
             Petit Allegro

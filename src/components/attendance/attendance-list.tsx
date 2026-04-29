@@ -17,19 +17,19 @@ const STATUS_OPTIONS: {
     value: "present",
     label: "P",
     icon: CheckIcon,
-    activeClass: "bg-green-600 text-white hover:bg-green-700",
+    activeClass: "bg-primary text-primary-foreground hover:bg-primary/90",
   },
   {
     value: "absent",
     label: "F",
     icon: XIcon,
-    activeClass: "bg-red-600 text-white hover:bg-red-700",
+    activeClass: "bg-destructive text-white hover:bg-destructive/90",
   },
   {
     value: "justified",
     label: "J",
     icon: AlertTriangleIcon,
-    activeClass: "bg-yellow-500 text-white hover:bg-yellow-600",
+    activeClass: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
   },
 ];
 

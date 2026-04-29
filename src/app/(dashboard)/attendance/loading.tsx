@@ -18,7 +18,7 @@ export default function AttendanceLoading() {
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="h-20 rounded-md border border-gold/20 bg-card animate-pulse"
+            className="h-20 rounded-md border border-primary/20 bg-card animate-pulse"
           />
         ))}
       </div>

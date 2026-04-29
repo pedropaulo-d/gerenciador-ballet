@@ -49,7 +49,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col pb-16">
-      {/* ─── Header with gold accent line ─── */}
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5">
           <Link href="/" className="group flex items-baseline gap-2">
@@ -59,17 +58,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </Link>
           <UserNav />
         </div>
-        {/* Gold accent line — teatro balcony rail */}
-        <div className="h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+        <div className="h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-5 py-6">
         {children}
       </main>
 
-      {/* ─── Bottom navigation ─── */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="h-px bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
+        <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
         <div className="mx-auto flex h-15 max-w-3xl items-center justify-around">
           {navItems.map((item) => {
             const isActive = item.exact
@@ -82,7 +79,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors",
                   isActive
-                    ? "text-gold"
+                    ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -98,7 +95,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             className={cn(
               "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors",
               isMoreActive
-                ? "text-gold"
+                ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -124,7 +121,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors",
                       isActive
-                        ? "bg-gold-light/30 text-gold font-medium"
+                        ? "bg-secondary/40 text-primary font-medium"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
                   >
