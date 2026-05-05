@@ -4,17 +4,17 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, handleAuthError } from "@/lib/auth-guard";
-import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
 import { startPerf } from "@/lib/perf";
+import type { ActionResult } from "@/lib/action-result";
+import type { AttendanceRow, AttendanceStatus } from "@/types/database";
 
 const supabase = getServiceSupabase();
-import type { AttendanceRow, AttendanceStatus } from "@/types/database";
 
 // ---------- Validation ----------
 
 const uuidSchema = z.string().uuid();
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de data invalido.");
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const attendanceStatusSchema = z.enum(["present", "absent", "justified"]);
 
 const attendanceRecordSchema = z.object({
@@ -53,7 +53,7 @@ export async function getAttendanceByClassAndDate(
     await requireAuth();
 
     const parsedId = uuidSchema.safeParse(classId);
-    const parsedDate = dateSchema.safeParse(date);
+    const parsedDate = isoDateSchema.safeParse(date);
     if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
     if (!parsedDate.success) return { success: false, error: "Data invalida." };
 
@@ -123,7 +123,7 @@ export async function saveAttendance(
   try {
     await requireAuth();
 
-    const parsedDate = dateSchema.safeParse(date);
+    const parsedDate = isoDateSchema.safeParse(date);
     if (!parsedDate.success) return { success: false, error: "Data invalida." };
 
     const parsedRecords = z.array(attendanceRecordSchema).safeParse(records);

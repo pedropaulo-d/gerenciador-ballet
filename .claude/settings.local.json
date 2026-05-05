@@ -12,7 +12,10 @@
       "Bash(xargs grep *)",
       "Bash(find src *)",
       "Bash(xargs head *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(awk -F',' 'NR>1 {print $6}' \"PETIT ALLEGRO.csv\")",
+      "Bash(awk -F',' 'NR>1 && $6!=\"\" {print $6}' \"PETIT ALLEGRO.csv\")",
+      "Bash(node *)"
     ]
   }
 }

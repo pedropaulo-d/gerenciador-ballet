@@ -11,7 +11,10 @@ import { safeDbError } from "@/lib/safe-error";
 const supabase = getServiceSupabase();
 
 const uuidSchema = z.string().uuid();
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+// Maximum number of past absences/justifications shown in the student profile timeline.
+const ABSENCE_HISTORY_LIMIT = 20;
 
 // ---------- Types ----------
 
@@ -78,7 +81,7 @@ function processAttendance(
     if (r.date >= monthStart && r.date <= monthEnd && r.status in counts) {
       counts[r.status]++;
     }
-    if ((r.status === "absent" || r.status === "justified") && history.length < 20) {
+    if ((r.status === "absent" || r.status === "justified") && history.length < ABSENCE_HISTORY_LIMIT) {
       history.push({ date: r.date, status: r.status, justification: r.justification });
     }
   }
@@ -159,6 +162,8 @@ export async function getStudentSummary(
         .eq("enrollment_id", enrollmentId)
         .order("date", { ascending: false });
 
+      let attendanceRows: AttendanceDetailRow[];
+
       if (isAdmin) {
         const [feeRes, overdueRes, attendanceRes] = await Promise.all([
           supabase
@@ -177,24 +182,15 @@ export async function getStudentSummary(
 
         currentMonthStatus = (feeRes.data as FeeStatusRow[] | null)?.[0]?.status ?? null;
         hasOverdueHistory = (overdueRes.count ?? 0) > 0;
-
-        const processed = processAttendance(
-          (attendanceRes.data ?? []) as AttendanceDetailRow[],
-          start,
-          end,
-        );
-        attendanceCounts = processed.counts;
-        absenceHistory = processed.history;
+        attendanceRows = (attendanceRes.data ?? []) as AttendanceDetailRow[];
       } else {
         const attendanceRes = await attendancePromise;
-        const processed = processAttendance(
-          (attendanceRes.data ?? []) as AttendanceDetailRow[],
-          start,
-          end,
-        );
-        attendanceCounts = processed.counts;
-        absenceHistory = processed.history;
+        attendanceRows = (attendanceRes.data ?? []) as AttendanceDetailRow[];
       }
+
+      const processed = processAttendance(attendanceRows, start, end);
+      attendanceCounts = processed.counts;
+      absenceHistory = processed.history;
     }
 
     return {
@@ -226,7 +222,7 @@ export async function getTodayAbsencesCount(
   try {
     await requireAuth();
 
-    const parsedDate = dateSchema.safeParse(date);
+    const parsedDate = isoDateSchema.safeParse(date);
     if (!parsedDate.success) return { success: false, error: "Data invalida." };
 
     const { count, error } = await supabase

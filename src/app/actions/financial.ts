@@ -4,16 +4,19 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
-import type { ActionResult } from "@/lib/action-result";
+import { safeDbError } from "@/lib/safe-error";
+import { computeDueDate } from "@/lib/financial-utils";
 import { startPerf } from "@/lib/perf";
+import { nowBrasilia } from "@/lib/formatters";
+import type { ActionResult } from "@/lib/action-result";
+import type { MonthlyFeeWithDetails } from "@/types/database";
 
 const supabase = getServiceSupabase();
-import type { MonthlyFeeWithDetails } from "@/types/database";
-import { nowBrasilia } from "@/lib/formatters";
 
 // ---------- Validation Schemas ----------
 
 const uuidSchema = z.string().uuid();
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const referenceMonthSchema = z.string().regex(/^\d{4}-\d{2}-01$/, "Formato invalido. Use YYYY-MM-01.");
 const positiveAmount = z.number().positive().max(99_999_999.99);
 const pageSchema = z.number().int().min(1).max(10_000);
@@ -36,8 +39,6 @@ export type FinancialPageData = {
   total: number;
   summary: FinancialSummary;
 };
-
-// ---------- Query-specific row shapes ----------
 
 // ---------- Supabase join shape helpers ----------
 // PostgREST returns objects for many-to-one joins (FK on source table)
@@ -74,6 +75,7 @@ export type FinancialFilters = {
   status?: string;
   locationId?: string;
   classId?: string;
+  search?: string;
 };
 
 // ---------- Actions ----------
@@ -106,10 +108,37 @@ export async function getFinancialByMonth(
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    // Pre-filter enrollment IDs when filtering by location or class.
+    // Pre-filter enrollment IDs when filtering by location, class, or search.
     // Supabase PostgREST can't filter parent rows by nested relations,
     // so we resolve the IDs first and use .in() on enrollment_id.
     let enrollmentIds: string[] | null = null;
+
+    if (filters?.search) {
+      const sanitized = filters.search.trim().replace(/[,.()"\\]/g, "");
+      if (sanitized) {
+        const term = `%${sanitized}%`;
+        const { data: matchingStudents } = await supabase
+          .from("students")
+          .select("id")
+          .or(
+            `full_name.ilike.${term},guardian_name.ilike.${term},guardian_phone.ilike.${term},guardian_cpf.ilike.${term}`,
+          );
+
+        const studentIds = (matchingStudents ?? []).map(
+          (s: { id: string }) => s.id,
+        );
+
+        if (studentIds.length === 0) {
+          enrollmentIds = [];
+        } else {
+          const { data: enrolls } = await supabase
+            .from("enrollments")
+            .select("id")
+            .in("student_id", studentIds);
+          enrollmentIds = (enrolls ?? []).map((e: { id: string }) => e.id);
+        }
+      }
+    }
 
     if (filters?.classId || filters?.locationId) {
       let enrollQuery = supabase
@@ -127,7 +156,14 @@ export async function getFinancialByMonth(
         const filtered = filters.locationId
           ? typed.filter((e) => unwrapJoin(e.class)?.location_id === filters.locationId)
           : typed;
-        enrollmentIds = filtered.map((e) => e.id);
+        const classLocIds = filtered.map((e) => e.id);
+
+        if (enrollmentIds !== null) {
+          const set = new Set(classLocIds);
+          enrollmentIds = enrollmentIds.filter((id) => set.has(id));
+        } else {
+          enrollmentIds = classLocIds;
+        }
       } else {
         enrollmentIds = [];
       }
@@ -158,7 +194,7 @@ export async function getFinancialByMonth(
       .order("created_at")
       .range(from, to);
 
-    if (error) return { success: false, error: "Falha ao buscar mensalidades." };
+    if (error) return { success: false, error: safeDbError(error, "getFinancialByMonth:fees") };
 
     const fees = data as MonthlyFeeWithDetails[];
 
@@ -200,7 +236,7 @@ async function markOverdueFees(referenceMonth: string): Promise<void> {
   const overdueIds: string[] = [];
   for (const fee of pendingFees as PendingFeeRow[]) {
     const dueDay = unwrapJoin(fee.enrollment)?.due_day ?? 5;
-    const dueDate = new Date(year, month - 1, dueDay, 23, 59, 59);
+    const dueDate = computeDueDate(referenceMonth, dueDay);
     if (now > dueDate) {
       overdueIds.push(fee.id);
     }
@@ -284,7 +320,7 @@ export async function generateFeesForMonth(
       .select("id, base_fee, class:classes(location:locations(fee_per_student))")
       .eq("status", "active");
 
-    if (enrollError) return { success: false, error: "Falha ao buscar matriculas ativas." };
+    if (enrollError) return { success: false, error: safeDbError(enrollError, "generateFeesForMonth:enrollments") };
     if (!enrollments || enrollments.length === 0) {
       return { success: true, data: { created: 0, skipped: 0 } };
     }
@@ -329,7 +365,7 @@ export async function generateFeesForMonth(
         .from("monthly_fees")
         .insert(toInsert);
 
-      if (insertError) return { success: false, error: "Falha ao inserir mensalidades." };
+      if (insertError) return { success: false, error: safeDbError(insertError, "generateFeesForMonth:insert") };
       revalidatePath("/finances");
     }
 
@@ -346,7 +382,9 @@ export async function generateFeesForMonth(
 }
 
 /**
- * Undo a paid fee: revert status to pending and clear payment fields.
+ * Undo a paid fee: revert status to overdue/pending (computed from due_day
+ * relative to current Brasilia time, mirroring undoPaymentsBatch) and clear
+ * payment fields.
  */
 export async function undoPayment(
   feeId: string
@@ -357,35 +395,43 @@ export async function undoPayment(
     const parsedId = uuidSchema.safeParse(feeId);
     if (!parsedId.success) return { success: false, error: "ID da mensalidade invalido." };
 
-    // Fetch enrollment base_fee to restore the original gross_amount
+    // Fetch enrollment data to restore the original gross_amount and to
+    // compute whether the fee is past its due date.
     const { data: fee, error: fetchError } = await supabase
       .from("monthly_fees")
-      .select("enrollment:enrollments(base_fee)")
+      .select("reference_month, enrollment:enrollments(base_fee, due_day)")
       .eq("id", feeId)
       .single();
 
     if (fetchError || !fee) {
-      return { success: false, error: "Mensalidade nao encontrada." };
+      return { success: false, error: safeDbError(fetchError, "undoPayment:fetch") };
     }
 
     const enrollment = unwrapJoin(
-      fee.enrollment as unknown as { base_fee: number } | { base_fee: number }[] | null
+      fee.enrollment as unknown as
+        | { base_fee: number; due_day: number }
+        | { base_fee: number; due_day: number }[]
+        | null
     );
     const baseFee = Number(enrollment?.base_fee ?? 0);
+    const dueDay = enrollment?.due_day ?? 5;
+
+    const dueDate = computeDueDate(fee.reference_month as string, dueDay);
+    const newStatus = nowBrasilia() > dueDate ? "overdue" : "pending";
 
     // Reset payment fields but PRESERVE location_fee (set at generation time).
     // Zeroing location_fee would corrupt net_amount on subsequent payments.
     const { error } = await supabase
       .from("monthly_fees")
       .update({
-        status: "pending",
+        status: newStatus,
         gross_amount: baseFee,
         paid_at: null,
         asaas_fee: 0,
       })
       .eq("id", feeId);
 
-    if (error) return { success: false, error: "Falha ao desfazer pagamento." };
+    if (error) return { success: false, error: safeDbError(error, "undoPayment:update") };
     revalidatePath("/finances");
     return { success: true, data: null };
   } catch (e) {
@@ -406,27 +452,23 @@ export async function deleteMonthlyFees(
     if (!Array.isArray(ids) || ids.length === 0) {
       return { success: false, error: "Nenhuma mensalidade selecionada." };
     }
-
     if (ids.length > 500) {
       return { success: false, error: "Maximo de 500 mensalidades por vez." };
     }
 
-    for (const id of ids) {
-      if (!uuidSchema.safeParse(id).success) {
-        return { success: false, error: "ID de mensalidade invalido." };
-      }
+    const parsedIds = z.array(uuidSchema).safeParse(ids);
+    if (!parsedIds.success) {
+      return { success: false, error: "ID de mensalidade invalido." };
     }
 
     const { error, count } = await supabase
       .from("monthly_fees")
       .delete({ count: "exact" })
-      .in("id", ids);
+      .in("id", parsedIds.data);
 
-    if (error) return { success: false, error: "Falha ao excluir mensalidades." };
-
+    if (error) return { success: false, error: safeDbError(error, "deleteMonthlyFees") };
     revalidatePath("/finances");
-
-    return { success: true, data: { deleted: count ?? ids.length } };
+    return { success: true, data: { deleted: count ?? parsedIds.data.length } };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao excluir mensalidades." };
   }
@@ -463,7 +505,7 @@ export async function payFeeManually(
       })
       .eq("id", feeId);
 
-    if (error) return { success: false, error: "Falha ao registrar pagamento." };
+    if (error) return { success: false, error: safeDbError(error, "payFeeManually") };
     revalidatePath("/finances");
     return { success: true, data: null };
   } catch (e) {
@@ -471,7 +513,6 @@ export async function payFeeManually(
   }
 }
 
-const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data invalida.");
 const batchPaymentSchema = z
   .array(
     z.object({
@@ -563,21 +604,21 @@ export async function undoPaymentsBatch(
     if (feeIds.length > 500) {
       return { success: false, error: "Maximo de 500 mensalidades por vez." };
     }
-    for (const id of feeIds) {
-      if (!uuidSchema.safeParse(id).success) {
-        return { success: false, error: "ID de mensalidade invalido." };
-      }
+
+    const parsedIds = z.array(uuidSchema).safeParse(feeIds);
+    if (!parsedIds.success) {
+      return { success: false, error: "ID de mensalidade invalido." };
     }
 
     // Fetch only fees that are currently paid — defensive against stale UI
     const { data: rows, error: fetchError } = await supabase
       .from("monthly_fees")
       .select("id, reference_month, enrollment:enrollments(base_fee, due_day)")
-      .in("id", feeIds)
+      .in("id", parsedIds.data)
       .eq("status", "paid");
 
     if (fetchError) {
-      return { success: false, error: "Falha ao buscar mensalidades." };
+      return { success: false, error: safeDbError(fetchError, "undoPaymentsBatch:fetch") };
     }
 
     const found = new Map<
@@ -599,15 +640,14 @@ export async function undoPaymentsBatch(
     const undoneIds: string[] = [];
     const failedIds: string[] = [];
 
-    for (const id of feeIds) {
+    for (const id of parsedIds.data) {
       const data = found.get(id);
       if (!data) {
         failedIds.push(id);
         continue;
       }
 
-      const [year, month] = data.referenceMonth.split("-").map(Number);
-      const dueDate = new Date(year, month - 1, data.dueDay, 23, 59, 59);
+      const dueDate = computeDueDate(data.referenceMonth, data.dueDay);
       const newStatus = now > dueDate ? "overdue" : "pending";
 
       const { error } = await supabase

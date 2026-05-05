@@ -4,16 +4,16 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
-import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
-
-const supabase = getServiceSupabase();
+import type { ActionResult } from "@/lib/action-result";
 import type {
   Class,
   ClassInsert,
   ClassUpdate,
   ClassWithLocation,
 } from "@/types/database";
+
+const supabase = getServiceSupabase();
 
 const uuidSchema = z.string().uuid();
 
@@ -30,7 +30,7 @@ const classInsertSchema = z.object({
 const classUpdateSchema = classInsertSchema.partial().strict();
 
 export async function getClassesWithLocation(
-  locationId?: string
+  locationId?: string,
 ): Promise<ActionResult<ClassWithLocation[]>> {
   try {
     await requireAuth();
@@ -55,7 +55,7 @@ export async function getClassesWithLocation(
 }
 
 export async function createClass(
-  payload: ClassInsert
+  payload: ClassInsert,
 ): Promise<ActionResult<Class>> {
   try {
     await requireAdmin();
@@ -65,7 +65,7 @@ export async function createClass(
 
     const { data, error } = await supabase
       .from("classes")
-      .insert(payload)
+      .insert(parsed.data)
       .select()
       .single();
 
@@ -79,7 +79,7 @@ export async function createClass(
 
 export async function updateClass(
   id: string,
-  payload: ClassUpdate
+  payload: ClassUpdate,
 ): Promise<ActionResult<Class>> {
   try {
     await requireAdmin();

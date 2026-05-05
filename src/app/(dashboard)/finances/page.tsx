@@ -28,6 +28,7 @@ type SearchParams = Promise<{
   status?: string;
   location?: string;
   class?: string;
+  q?: string;
 }>;
 
 export default async function FinancesPage({
@@ -44,6 +45,7 @@ export default async function FinancesPage({
     status: sp.status && sp.status !== ALL ? sp.status : undefined,
     locationId: sp.location && sp.location !== ALL ? sp.location : undefined,
     classId: sp.class && sp.class !== ALL ? sp.class : undefined,
+    search: sp.q?.trim() || undefined,
   };
 
   const [locRes, clsRes, finRes] = await Promise.all([

@@ -1,8 +1,10 @@
 "use server";
 
 import { getServiceSupabase } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import { safeDbError } from "@/lib/safe-error";
+import type { ActionResult } from "@/lib/action-result";
+import { normalize, type ClassLookupEntry, type CsvRow } from "@/lib/csv-import";
 
 const supabase = getServiceSupabase();
 
@@ -18,19 +20,6 @@ export type ImportResult = {
   imported: number;
   failed: number;
   results: ImportRowResult[];
-};
-
-type CsvRow = {
-  "NOME DO RESPONSAVEL": string;
-  EMAIL: string;
-  CELULAR: string;
-  "CPF ou CNPJ": string;
-  "TIPO DE ALUNA": string;
-  TURMA: string;
-  "NOME DA ALUNA": string;
-  PLANO: string;
-  MENSALIDADE: string;
-  "TAXA DA ESCOLA": string;
 };
 
 function parseCurrency(value: string): number {
@@ -57,81 +46,50 @@ function parseIsInternal(tipo: string): boolean {
   return normalized.includes("intern");
 }
 
-/**
- * Normaliza string para comparação: lowercase, remove acentos.
- */
-function normalize(str: string): string {
-  return str
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
+export async function getClassesForImport(): Promise<
+  ActionResult<ClassLookupEntry[]>
+> {
+  try {
+    await requireAdmin();
 
-/**
- * CSV TURMA format: "INFANTIL 2 - MÃE CORUJA"
- *   → classPart: "infantil 2"
- *   → locationKeyword: "mae coruja"
- *
- * DB has: class.name = "Infantil 2", location.name = "Creche e Pré-Escola Mãe Coruja"
- *
- * Match: class.name matches classPart AND location.name contains locationKeyword.
- */
-type ClassLookupEntry = {
-  classId: string;
-  className: string;
-  locationName: string;
-};
+    const { data, error } = await supabase
+      .from("classes")
+      .select("id, name, location:locations(name)")
+      .order("name");
 
-/**
- * Splits a normalized string into words (3+ chars) for fuzzy matching.
- * Ignores short prepositions like "de", "da", "do", "e".
- */
-function significantWords(str: string): string[] {
-  return normalize(str)
-    .split(/\s+/)
-    .filter((w) => w.length >= 3);
-}
+    if (error) {
+      return { success: false, error: safeDbError(error, "getClassesForImport") };
+    }
 
-/**
- * Returns true if every significant word from `keyword` appears in `target`.
- * This tolerates typos in the CSV like "ACONHEGO" matching "Aconchego"
- * by checking if the target contains words that START WITH the keyword word
- * (min 3 chars prefix match).
- */
-function fuzzyContains(target: string, keyword: string): boolean {
-  const targetWords = significantWords(target);
-  const keywordWords = significantWords(keyword);
+    const typed = (data ?? []) as {
+      id: string;
+      name: string;
+      location: { name: string }[] | { name: string } | null;
+    }[];
 
-  return keywordWords.every((kw) =>
-    targetWords.some(
-      (tw) => tw.includes(kw) || kw.includes(tw) || tw.startsWith(kw.slice(0, 4))
-    )
-  );
-}
+    const entries: ClassLookupEntry[] = typed.map((cls) => {
+      const loc = Array.isArray(cls.location) ? cls.location[0] : cls.location;
+      return {
+        classId: cls.id,
+        className: cls.name,
+        locationName: loc?.name ?? "",
+      };
+    });
 
-function findClassId(
-  turma: string,
-  entries: ClassLookupEntry[]
-): ClassLookupEntry | undefined {
-  const separatorIdx = turma.indexOf(" - ");
-  if (separatorIdx === -1) {
-    const normTurma = normalize(turma);
-    return entries.find((e) => normalize(e.className) === normTurma);
+    return { success: true, data: entries };
+  } catch (e) {
+    return (
+      handleAuthError<ClassLookupEntry[]>(e) ?? {
+        success: false,
+        error: "Falha ao carregar turmas.",
+      }
+    );
   }
-
-  const classPart = normalize(turma.slice(0, separatorIdx));
-  const locationKeyword = turma.slice(separatorIdx + 3);
-
-  return entries.find(
-    (e) =>
-      normalize(e.className) === classPart &&
-      fuzzyContains(e.locationName, locationKeyword)
-  );
 }
 
 export async function importStudentsFromCsv(
-  rows: CsvRow[]
+  rows: CsvRow[],
+  classMap: Record<string, string>,
 ): Promise<ImportResult> {
   await requireAdmin();
 
@@ -139,43 +97,20 @@ export async function importStudentsFromCsv(
   let imported = 0;
   let failed = 0;
 
-  // Pre-fetch existing students to avoid duplicates (normalized name)
   const { data: existingStudents } = await supabase
     .from("students")
     .select("full_name");
 
   const existingNames = new Set(
     (existingStudents ?? []).map((s: { full_name: string }) =>
-      normalize(s.full_name)
-    )
+      normalize(s.full_name),
+    ),
   );
 
-  // Pre-fetch all classes with their locations
-  const { data: classes, error: classesError } = await supabase
-    .from("classes")
-    .select("id, name, location:locations(name)");
-
-  if (classesError || !classes) {
-    return {
-      total: rows.length,
-      imported: 0,
-      failed: rows.length,
-      results: rows.map((row, i) => ({
-        row: i + 1,
-        studentName: row["NOME DA ALUNA"] || "??",
-        success: false,
-        error: "Falha ao carregar turmas do banco.",
-      })),
-    };
-  }
-
-  // Build lookup entries
-  const typedClasses = classes as { id: string; name: string; location: { name: string }[] }[];
-  const lookupEntries: ClassLookupEntry[] = typedClasses.map((cls) => ({
-    classId: cls.id,
-    className: cls.name,
-    locationName: cls.location?.[0]?.name ?? "",
-  }));
+  const { data: validClasses } = await supabase.from("classes").select("id");
+  const validClassIds = new Set(
+    (validClasses ?? []).map((c: { id: string }) => c.id),
+  );
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -193,7 +128,6 @@ export async function importStudentsFromCsv(
       continue;
     }
 
-    // Skip duplicates
     if (existingNames.has(normalize(studentName))) {
       results.push({
         row: rowNum,
@@ -206,22 +140,31 @@ export async function importStudentsFromCsv(
     }
 
     try {
-      // 1. Resolve class_id via composite match
       const turmaRaw = (row["TURMA"] || "").trim();
-      const match = findClassId(turmaRaw, lookupEntries);
+      const classId = classMap[turmaRaw];
 
-      if (!match) {
+      if (!classId) {
         results.push({
           row: rowNum,
           studentName,
           success: false,
-          error: `Turma não encontrada: "${turmaRaw}". Turmas disponíveis: ${lookupEntries.map((e) => `${e.className} - ${e.locationName}`).join(", ")}`,
+          error: `Turma "${turmaRaw}" não foi mapeada na etapa de confirmação.`,
         });
         failed++;
         continue;
       }
 
-      // 2. Insert student
+      if (!validClassIds.has(classId)) {
+        results.push({
+          row: rowNum,
+          studentName,
+          success: false,
+          error: "ID de turma inválido.",
+        });
+        failed++;
+        continue;
+      }
+
       const { data: student, error: studentError } = await supabase
         .from("students")
         .insert({
@@ -247,7 +190,6 @@ export async function importStudentsFromCsv(
         continue;
       }
 
-      // 3. Insert enrollment
       const now = new Date();
       const year = now.getFullYear();
       const validityType = parseValidityType(row["PLANO"] || "");
@@ -261,7 +203,7 @@ export async function importStudentsFromCsv(
         .from("enrollments")
         .insert({
           student_id: student.id,
-          class_id: match.classId,
+          class_id: classId,
           status: "active",
           validity_type: validityType,
           starts_at: startsAt,

@@ -7,8 +7,6 @@ import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
 import { startPerf } from "@/lib/perf";
-
-const supabase = getServiceSupabase();
 import type {
   Student,
   StudentInsert,
@@ -17,13 +15,16 @@ import type {
   EnrollmentInsert,
 } from "@/types/database";
 
+const supabase = getServiceSupabase();
+
 // ---------- Validation ----------
 
 const uuidSchema = z.string().uuid();
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const studentInsertSchema = z.object({
   full_name: z.string().trim().min(1, "Nome obrigatorio.").max(200),
-  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  birth_date: isoDateSchema.nullish(),
   guardian_name: z.string().trim().min(1, "Nome do responsavel obrigatorio.").max(200),
   guardian_phone: z.string().max(30).nullish(),
   guardian_email: z.string().email().max(200).nullish().or(z.literal("")).transform(v => v || null),
@@ -37,8 +38,8 @@ const enrollmentInsertSchema = z.object({
   class_id: uuidSchema,
   status: z.enum(["active", "inactive", "pending"]),
   validity_type: z.enum(["semester", "annual"]),
-  starts_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  ends_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  starts_at: isoDateSchema,
+  ends_at: isoDateSchema,
   base_fee: z.number().nonnegative().max(99_999_999.99),
   due_day: z.union([z.literal(5), z.literal(7)]),
 });
@@ -179,7 +180,7 @@ export async function createStudentWithEnrollment(
 
     const { data: student, error: studentError } = await supabase
       .from("students")
-      .insert(studentPayload)
+      .insert(parsedStudent.data)
       .select()
       .single();
 
@@ -188,7 +189,7 @@ export async function createStudentWithEnrollment(
     const { error: enrollmentError } = await supabase
       .from("enrollments")
       .insert({
-        ...enrollmentPayload,
+        ...parsedEnrollment.data,
         student_id: student.id,
       });
 
@@ -267,22 +268,19 @@ export async function deleteStudents(
       return { success: false, error: "Maximo de 500 alunas por vez." };
     }
 
-    for (const id of ids) {
-      if (!uuidSchema.safeParse(id).success) {
-        return { success: false, error: "ID de aluna invalido." };
-      }
+    const parsedIds = z.array(uuidSchema).safeParse(ids);
+    if (!parsedIds.success) {
+      return { success: false, error: "ID de aluna invalido." };
     }
 
     const { error, count } = await supabase
       .from("students")
       .delete({ count: "exact" })
-      .in("id", ids);
+      .in("id", parsedIds.data);
 
-    if (error) return { success: false, error: "Falha ao excluir alunas." };
-
+    if (error) return { success: false, error: safeDbError(error, "deleteStudents") };
     revalidatePath("/students");
-
-    return { success: true, data: { deleted: count ?? ids.length } };
+    return { success: true, data: { deleted: count ?? parsedIds.data.length } };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao excluir alunas." };
   }

@@ -75,6 +75,7 @@ export function FinancesList({
   const urlStatus = searchParams.get("status") ?? ALL;
   const urlLocationId = searchParams.get("location") ?? ALL;
   const urlClassId = searchParams.get("class") ?? ALL;
+  const urlQ = searchParams.get("q") ?? "";
 
   // UI-only state (nada relacionado a fetch de dados).
   const [generating, setGenerating] = useState(false);
@@ -281,11 +282,13 @@ export function FinancesList({
       />
 
       <FinancialFiltersUI
+        search={urlQ}
         status={urlStatus}
         locationId={urlLocationId}
         classId={urlClassId}
         locations={locations}
         classes={classes}
+        onSearchChange={(v) => setParams({ q: v || undefined, page: undefined })}
         onStatusChange={(v) => setParams({ status: v })}
         onLocationChange={(v) => setParams({ location: v, class: undefined })}
         onClassChange={(v) => setParams({ class: v })}

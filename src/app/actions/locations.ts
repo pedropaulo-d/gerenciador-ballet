@@ -4,11 +4,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
-import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
+import type { ActionResult } from "@/lib/action-result";
+import type { Location, LocationInsert, LocationUpdate } from "@/types/database";
 
 const supabase = getServiceSupabase();
-import type { Location, LocationInsert, LocationUpdate } from "@/types/database";
 
 const uuidSchema = z.string().uuid();
 
@@ -38,7 +38,7 @@ export async function getLocations(): Promise<ActionResult<Location[]>> {
 }
 
 export async function createLocation(
-  payload: LocationInsert
+  payload: LocationInsert,
 ): Promise<ActionResult<Location>> {
   try {
     await requireAdmin();
@@ -48,7 +48,7 @@ export async function createLocation(
 
     const { data, error } = await supabase
       .from("locations")
-      .insert(payload)
+      .insert(parsed.data)
       .select()
       .single();
 
@@ -62,7 +62,7 @@ export async function createLocation(
 
 export async function updateLocation(
   id: string,
-  payload: LocationUpdate
+  payload: LocationUpdate,
 ): Promise<ActionResult<Location>> {
   try {
     await requireAdmin();
@@ -88,19 +88,14 @@ export async function updateLocation(
   }
 }
 
-export async function deleteLocation(
-  id: string
-): Promise<ActionResult> {
+export async function deleteLocation(id: string): Promise<ActionResult> {
   try {
     await requireAdmin();
 
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID do local invalido." };
 
-    const { error } = await supabase
-      .from("locations")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("locations").delete().eq("id", id);
 
     if (error) return { success: false, error: safeDbError(error, "deleteLocation") };
     revalidatePath("/locations");
