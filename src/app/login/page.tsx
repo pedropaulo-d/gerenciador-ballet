@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { z } from 'zod';
 import { signIn } from '@/app/actions/auth';
+import { loginSchema } from '@/lib/auth-schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,18 +14,6 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
-
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'O e-mail é obrigatório.')
-    .email('Informe um e-mail válido.'),
-  password: z
-    .string()
-    .min(8, 'A senha deve ter no mínimo 8 caracteres.')
-    .regex(/[A-Z]/, 'A senha deve conter pelo menos uma letra maiúscula.')
-    .regex(/[0-9]/, 'A senha deve conter pelo menos um número.'),
-});
 
 export default function LoginPage() {
   const router = useRouter();

@@ -6,6 +6,7 @@ import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import { safeDbError } from "@/lib/safe-error";
 import { computeDueDate } from "@/lib/financial-utils";
+import { unwrapJoin } from "@/lib/supabase-helpers";
 import { startPerf } from "@/lib/perf";
 import { nowBrasilia } from "@/lib/formatters";
 import type { ActionResult } from "@/lib/action-result";
@@ -41,14 +42,6 @@ export type FinancialPageData = {
 };
 
 // ---------- Supabase join shape helpers ----------
-// PostgREST returns objects for many-to-one joins (FK on source table)
-// and arrays for one-to-many. We handle both defensively.
-
-/** Unwrap a PostgREST join that may be object or array */
-function unwrapJoin<T>(value: T | T[] | null | undefined): T | undefined {
-  if (value == null) return undefined;
-  return Array.isArray(value) ? value[0] : value;
-}
 
 /** Shape returned by markOverdueFees: "id, enrollment:enrollments(due_day)" */
 type PendingFeeRow = {

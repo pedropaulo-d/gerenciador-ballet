@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import type { Location, ClassWithLocation } from "@/types/database";
-import { Input } from "@/components/ui/input";
+import { DebouncedSearchInput } from "@/components/ui/debounced-search-input";
 import {
   Select,
   SelectContent,
@@ -10,10 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchIcon } from "lucide-react";
 
 const ALL = "__all__";
-const SEARCH_DEBOUNCE_MS = 300;
 
 interface FinancialFiltersProps {
   search: string;
@@ -40,44 +37,18 @@ export function FinancialFilters({
   onLocationChange,
   onClassChange,
 }: FinancialFiltersProps) {
-  const [searchInput, setSearchInput] = useState(search);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setSearchInput(search);
-  }, [search]);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
   const filteredClasses =
     locationId !== ALL
       ? classes.filter((c) => c.location_id === locationId)
       : classes;
 
-  function handleChange(value: string) {
-    setSearchInput(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      const normalized = value.trim();
-      if (normalized !== search) onSearchChange(normalized);
-    }, SEARCH_DEBOUNCE_MS);
-  }
-
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative">
-        <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por aluna, responsável, telefone ou CPF..."
-          value={searchInput}
-          onChange={(e) => handleChange(e.target.value)}
-          className="pl-8"
-        />
-      </div>
+      <DebouncedSearchInput
+        value={search}
+        onChange={onSearchChange}
+        placeholder="Buscar por aluna, responsável, telefone ou CPF..."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Select value={status} onValueChange={onStatusChange}>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { MonthlyFeeWithDetails } from "@/types/database";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, todayISO } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,14 +25,6 @@ interface BatchPaymentDialogProps {
   ) => Promise<void>;
 }
 
-function todayIsoLocal(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 function buildInitialAmounts(fees: MonthlyFeeWithDetails[]): Record<string, string> {
   const next: Record<string, string> = {};
   for (const f of fees) next[f.id] = Number(f.gross_amount).toFixed(2);
@@ -46,7 +38,7 @@ export function BatchPaymentDialog({
   onConfirm,
 }: BatchPaymentDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [paymentDate, setPaymentDate] = useState(todayIsoLocal());
+  const [paymentDate, setPaymentDate] = useState(todayISO());
   const [amounts, setAmounts] = useState<Record<string, string>>(() =>
     buildInitialAmounts(fees),
   );
@@ -58,7 +50,7 @@ export function BatchPaymentDialog({
   if (prevSignature !== signature) {
     setPrevSignature(signature);
     setAmounts(buildInitialAmounts(fees));
-    setPaymentDate(todayIsoLocal());
+    setPaymentDate(todayISO());
   }
 
   function setAmount(id: string, v: string) {

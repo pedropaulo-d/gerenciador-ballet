@@ -3,6 +3,8 @@
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import { safeDbError } from "@/lib/safe-error";
+import { unwrapJoin } from "@/lib/supabase-helpers";
+import { computeEnrollmentDates } from "@/lib/enrollment-utils";
 import type { ActionResult } from "@/lib/action-result";
 import { normalize, type ClassLookupEntry, type CsvRow } from "@/lib/csv-import";
 
@@ -67,14 +69,11 @@ export async function getClassesForImport(): Promise<
       location: { name: string }[] | { name: string } | null;
     }[];
 
-    const entries: ClassLookupEntry[] = typed.map((cls) => {
-      const loc = Array.isArray(cls.location) ? cls.location[0] : cls.location;
-      return {
-        classId: cls.id,
-        className: cls.name,
-        locationName: loc?.name ?? "",
-      };
-    });
+    const entries: ClassLookupEntry[] = typed.map((cls) => ({
+      classId: cls.id,
+      className: cls.name,
+      locationName: unwrapJoin(cls.location)?.name ?? "",
+    }));
 
     return { success: true, data: entries };
   } catch (e) {
@@ -190,14 +189,8 @@ export async function importStudentsFromCsv(
         continue;
       }
 
-      const now = new Date();
-      const year = now.getFullYear();
       const validityType = parseValidityType(row["PLANO"] || "");
-      const startsAt = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-      const endsAt =
-        validityType === "semester"
-          ? `${year}-${String(Math.min(now.getMonth() + 7, 12)).padStart(2, "0")}-01`
-          : `${year}-12-31`;
+      const { startsAt, endsAt } = computeEnrollmentDates(validityType);
 
       const { error: enrollmentError } = await supabase
         .from("enrollments")

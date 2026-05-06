@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { jwtVerify, createRemoteJWKSet, type JWTPayload } from 'jose';
 import { createMiddlewareClient } from '@/lib/supabase-middleware';
+import { resolveRole } from '@/lib/role-resolver';
 
 const PUBLIC_ROUTES = ['/login'];
 const ADMIN_ONLY_ROUTES = ['/finances', '/locations', '/classes', '/admin'];
@@ -38,25 +39,6 @@ async function verifyAccessToken(token: string | undefined | null): Promise<JWTP
   }
 }
 
-/**
- * Tenta extrair a role do claim `app_metadata.role` (caminho rápido, zero DB).
- * Só cai no SELECT em profiles quando o claim não existe — caso de tokens
- * emitidos antes da trigger sync_profile_role_to_jwt rodar.
- */
-async function resolveRole(claims: JWTPayload): Promise<'admin' | 'teacher'> {
-  const appMetadata = claims.app_metadata as { role?: string } | undefined;
-  if (appMetadata?.role === 'admin') return 'admin';
-  if (appMetadata?.role === 'teacher') return 'teacher';
-
-  const { data: profile } = await getServiceClient()
-    .from('profiles')
-    .select('role')
-    .eq('id', claims.sub as string)
-    .single();
-
-  return profile?.role === 'admin' ? 'admin' : 'teacher';
-}
-
 export async function middleware(request: NextRequest) {
   const totalStart = performance.now();
   const { pathname } = request.nextUrl;
@@ -83,7 +65,11 @@ export async function middleware(request: NextRequest) {
 
     if (ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
       const roleStart = performance.now();
-      const role = await resolveRole(claims);
+      const role = await resolveRole(
+        getServiceClient(),
+        claims.sub as string,
+        claims.app_metadata as Record<string, unknown> | undefined,
+      );
       roleMs = performance.now() - roleStart;
       if (role !== 'admin') {
         const url = request.nextUrl.clone();

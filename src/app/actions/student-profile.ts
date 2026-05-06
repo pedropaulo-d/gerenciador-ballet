@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, handleAuthError } from "@/lib/auth-guard";
+import { unwrapJoin } from "@/lib/supabase-helpers";
 import type { ActionResult } from "@/lib/action-result";
 import type { AttendanceStatus } from "@/types/database";
 import { getCurrentMonth, getCurrentMonthRange } from "@/lib/formatters";
@@ -140,10 +141,7 @@ export async function getStudentSummary(
     const enrollmentInfo = enrollmentRow?.class
       ? {
           className: enrollmentRow.class.name,
-          locationName:
-            (Array.isArray(enrollmentRow.class.location)
-              ? enrollmentRow.class.location[0]?.name
-              : enrollmentRow.class.location?.name) ?? "—",
+          locationName: unwrapJoin(enrollmentRow.class.location)?.name ?? "—",
         }
       : null;
 

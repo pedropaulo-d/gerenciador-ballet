@@ -31,14 +31,6 @@ export function useUserProfile(): UserProfile | null {
   return useContext(UserProfileContext);
 }
 
-/**
- * Mantido por compatibilidade de assinatura. Como o profile é pré-carregado
- * no servidor, nunca está "loading" no cliente.
- */
-export function useUserProfileLoading(): boolean {
-  return false;
-}
-
 export function useIsAdmin(): boolean {
   return useContext(UserProfileContext)?.role === "admin";
 }

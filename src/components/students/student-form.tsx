@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Student, ClassWithLocation } from "@/types/database";
+import { computeEnrollmentDates } from "@/lib/enrollment-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,13 +80,7 @@ export function formDataToStudentPayload(form: StudentFormData) {
 }
 
 export function formDataToEnrollmentPayload(form: StudentFormData) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const startsAt = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  const endsAt =
-    form.validity_type === "semester"
-      ? `${year}-${String(Math.min(now.getMonth() + 7, 12)).padStart(2, "0")}-01`
-      : `${year}-12-31`;
+  const { startsAt, endsAt } = computeEnrollmentDates(form.validity_type);
 
   return {
     class_id: form.class_id,

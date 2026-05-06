@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAuth, handleAuthError } from "@/lib/auth-guard";
+import { unwrapJoin } from "@/lib/supabase-helpers";
 import { safeDbError } from "@/lib/safe-error";
 import { startPerf } from "@/lib/perf";
 import type { ActionResult } from "@/lib/action-result";
@@ -89,8 +90,7 @@ export async function getAttendanceByClassAndDate(
 
     // 3. Merge: one row per enrollment
     const rows: AttendanceRow[] = typedEnrollments.map((e) => {
-      // Supabase returns object for many-to-one, but handle array as fallback
-      const s = Array.isArray(e.student) ? e.student[0] : e.student;
+      const s = unwrapJoin(e.student);
       const record = recordMap.get(e.id);
       return {
         enrollmentId: e.id,

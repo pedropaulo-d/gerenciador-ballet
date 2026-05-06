@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import { getServiceSupabase } from "@/lib/supabase";
+import { resolveRole } from "@/lib/role-resolver";
 import type { ActionResult } from "@/lib/action-result";
 
 export type AuthSession = {
@@ -24,29 +25,6 @@ export function handleAuthError<T = null>(error: unknown): ActionResult<T> | nul
 }
 
 /**
- * Extrai a role do app_metadata do usuário (claim do JWT, já no objeto User).
- * Fallback: SELECT em profiles apenas se o claim não estiver presente
- * (tokens emitidos antes da trigger sync_profile_role_to_jwt).
- */
-async function resolveRole(
-  userId: string,
-  appMetadata: Record<string, unknown> | undefined
-): Promise<"admin" | "teacher"> {
-  const claimRole = appMetadata?.role;
-  if (claimRole === "admin") return "admin";
-  if (claimRole === "teacher") return "teacher";
-
-  const supabase = getServiceSupabase();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single();
-
-  return profile?.role === "admin" ? "admin" : "teacher";
-}
-
-/**
  * Verifica se o chamador está autenticado e retorna userId + role.
  * Lança erro se não houver sessão válida.
  */
@@ -60,7 +38,7 @@ export async function requireAuth(): Promise<AuthSession> {
     throw new Error("NOT_AUTHENTICATED");
   }
 
-  const role = await resolveRole(user.id, user.app_metadata);
+  const role = await resolveRole(getServiceSupabase(), user.id, user.app_metadata);
 
   return {
     userId: user.id,
