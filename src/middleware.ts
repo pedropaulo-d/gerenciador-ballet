@@ -23,8 +23,24 @@ function getServiceClient() {
         getAll: () => [],
         setAll: () => {},
       },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
     }
   );
+}
+
+function applyNoStore(response: NextResponse) {
+  // Rotas autenticadas NUNCA devem ser cacheadas por proxy/CDN — sob risco
+  // de servir a um cliente a resposta renderizada para outro.
+  response.headers.set(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, private'
+  );
+  response.headers.set('Pragma', 'no-cache');
+  return response;
 }
 
 async function verifyAccessToken(token: string | undefined | null): Promise<JWTPayload | null> {
@@ -60,7 +76,7 @@ export async function middleware(request: NextRequest) {
     if (!claims) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
-      return NextResponse.redirect(url);
+      return applyNoStore(NextResponse.redirect(url));
     }
 
     if (ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
@@ -74,11 +90,11 @@ export async function middleware(request: NextRequest) {
       if (role !== 'admin') {
         const url = request.nextUrl.clone();
         url.pathname = '/';
-        return NextResponse.redirect(url);
+        return applyNoStore(NextResponse.redirect(url));
       }
     }
 
-    return response;
+    return applyNoStore(response);
   } finally {
     const totalMs = performance.now() - totalStart;
     console.log(

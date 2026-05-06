@@ -15,7 +15,11 @@
       "WebSearch",
       "Bash(awk -F',' 'NR>1 {print $6}' \"PETIT ALLEGRO.csv\")",
       "Bash(awk -F',' 'NR>1 && $6!=\"\" {print $6}' \"PETIT ALLEGRO.csv\")",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(xargs wc *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npm list *)"
     ]
   }
 }

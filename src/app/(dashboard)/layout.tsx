@@ -4,6 +4,12 @@ import { getServiceSupabase } from "@/lib/supabase";
 import { UserRoleProvider, type UserProfile } from "@/lib/user-role-context";
 import { DashboardShell } from "./dashboard-shell";
 
+// Layout autenticado: depende de cookies por request. Sem isso, o segmento
+// pode ser tratado como estático/cacheado e servir o profile de um usuário
+// a outro (session bleeding em SSR).
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 /**
  * Carrega o profile server-side: role sai do claim app_metadata (zero DB),
  * full_name exige 1 SELECT em profiles (não está no JWT).
