@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import { getServiceSupabase } from "@/lib/supabase";
+import { resolveRole } from "@/lib/role-resolver";
 import { UserRoleProvider, type UserProfile } from "@/lib/user-role-context";
 import { DashboardShell } from "./dashboard-shell";
 
@@ -13,7 +14,7 @@ export const revalidate = 0;
 /**
  * Carrega o profile server-side: role sai do claim app_metadata (zero DB),
  * full_name exige 1 SELECT em profiles (não está no JWT).
- * Fallback de role para o SELECT caso o claim não exista em tokens antigos.
+ * Reutiliza resolveRole — mesma logica do middleware e auth-guard.
  */
 async function loadProfile(): Promise<UserProfile | null> {
   const authClient = await createClient();
@@ -23,25 +24,18 @@ async function loadProfile(): Promise<UserProfile | null> {
 
   if (!user) return null;
 
-  const appRole = (user.app_metadata as { role?: string } | undefined)?.role;
-  const roleFromClaim =
-    appRole === "admin" || appRole === "teacher" ? appRole : null;
-
   const supabase = getServiceSupabase();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role")
-    .eq("id", user.id)
-    .single();
 
-  if (!profile) return null;
+  const [role, profileRes] = await Promise.all([
+    resolveRole(supabase, user.id, user.app_metadata),
+    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+  ]);
 
-  const resolvedRole =
-    roleFromClaim ?? (profile.role === "admin" ? "admin" : "teacher");
+  if (!profileRes.data) return null;
 
   return {
-    fullName: profile.full_name,
-    role: resolvedRole,
+    fullName: profileRes.data.full_name,
+    role,
   };
 }
 

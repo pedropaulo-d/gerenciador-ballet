@@ -15,3 +15,15 @@ export function startPerf(name: string): () => void {
     console.log(`[PERF] ${name}: ${ms.toFixed(2)} ms`);
   };
 }
+
+/**
+ * Substitui UUIDs e sequências numéricas longas por `:id` para evitar
+ * vazar identificadores de banco em logs. Hoje a app só tem rotas
+ * estáticas em `(dashboard)/`, mas se uma rota dinâmica `/students/[id]`
+ * for adicionada, esse helper mantém o log limpo automaticamente.
+ */
+export function redactPath(pathname: string): string {
+  return pathname
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ":id")
+    .replace(/\/\d{6,}(?=\/|$)/g, "/:id");
+}

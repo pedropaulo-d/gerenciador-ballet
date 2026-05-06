@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { jwtVerify, createRemoteJWKSet, type JWTPayload } from 'jose';
 import { createMiddlewareClient } from '@/lib/supabase-middleware';
 import { resolveRole } from '@/lib/role-resolver';
+import { redactPath } from '@/lib/perf';
 
 const PUBLIC_ROUTES = ['/login'];
 const ADMIN_ONLY_ROUTES = ['/finances', '/locations', '/classes', '/admin'];
@@ -98,7 +99,7 @@ export async function middleware(request: NextRequest) {
   } finally {
     const totalMs = performance.now() - totalStart;
     console.log(
-      `[PERF] Middleware ${pathname}: ${totalMs.toFixed(2)} ms ` +
+      `[PERF] Middleware ${redactPath(pathname)}: ${totalMs.toFixed(2)} ms ` +
       `(jwt=${jwtMs.toFixed(2)}ms, role=${roleMs.toFixed(2)}ms)`
     );
   }

@@ -26,8 +26,15 @@ import {
   HeartPulseIcon,
 } from "lucide-react";
 
-function formatPhone(phone: string): string {
-  return phone.replace(/\D/g, "");
+/**
+ * Retorna o telefone reduzido a digitos se for um numero brasileiro
+ * valido (10 ou 11 digitos — fixo ou celular). Devolve null caso
+ * contrario, para que o caller esconda os links de tel:/wa.me em
+ * vez de gerar URLs quebradas.
+ */
+function sanitizePhone(phone: string): string | null {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 || digits.length === 11 ? digits : null;
 }
 
 function formatDateBR(date: string): string {
@@ -206,26 +213,38 @@ export function StudentProfileSheet({
                     <PhoneIcon className="size-3.5" />
                     <span>{data.student.guardianName}</span>
                   </div>
-                  {data.student.guardianPhone && (
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <a
-                        href={`tel:${data.student.guardianPhone}`}
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-muted px-3 py-2 text-sm nums font-semibold transition-colors hover:bg-muted/80"
-                      >
-                        <PhoneIcon className="size-3.5 shrink-0" />
-                        {data.student.guardianPhone}
-                      </a>
-                      <a
-                        href={`https://wa.me/55${formatPhone(data.student.guardianPhone)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
-                      >
-                        <MessageCircleIcon className="size-3.5 shrink-0" />
-                        WhatsApp
-                      </a>
-                    </div>
-                  )}
+                  {(() => {
+                    const phone = data.student.guardianPhone;
+                    if (!phone) return null;
+                    const safe = sanitizePhone(phone);
+                    if (!safe) {
+                      // Numero malformado — mostra texto sem botao clicavel
+                      // para nao gerar URL invalida em tel:/wa.me.
+                      return (
+                        <p className="text-sm text-muted-foreground">{phone}</p>
+                      );
+                    }
+                    return (
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <a
+                          href={`tel:+55${safe}`}
+                          className="flex items-center justify-center gap-1.5 rounded-md bg-muted px-3 py-2 text-sm nums font-semibold transition-colors hover:bg-muted/80"
+                        >
+                          <PhoneIcon className="size-3.5 shrink-0" />
+                          {phone}
+                        </a>
+                        <a
+                          href={`https://wa.me/55${safe}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
+                        >
+                          <MessageCircleIcon className="size-3.5 shrink-0" />
+                          WhatsApp
+                        </a>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </div>
