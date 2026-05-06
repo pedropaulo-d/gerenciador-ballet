@@ -9,8 +9,6 @@ import type { AttendanceStatus } from "@/types/database";
 import { getCurrentMonth, getCurrentMonthRange } from "@/lib/formatters";
 import { safeDbError } from "@/lib/safe-error";
 
-const supabase = getServiceSupabase();
-
 const uuidSchema = z.string().uuid();
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -102,6 +100,8 @@ export async function getStudentSummary(
     // Auth first: role gates both financial data and internal_observations.
     const { role: callerRole } = await requireAuth();
     const isAdmin = callerRole === "admin";
+
+    const supabase = getServiceSupabase();
 
     // 1. Student data — internal_observations is admin-only
     // (disciplinary/admin notes; teacher must not see it).
@@ -223,6 +223,7 @@ export async function getTodayAbsencesCount(
     const parsedDate = isoDateSchema.safeParse(date);
     if (!parsedDate.success) return { success: false, error: "Data invalida." };
 
+    const supabase = getServiceSupabase();
     const { count, error } = await supabase
       .from("attendance")
       .select("id", { count: "exact", head: true })

@@ -129,12 +129,18 @@ export function ImportTool() {
         csvRows as unknown as CsvRow[],
         classMap,
       );
-      setResult(res);
 
-      if (res.failed === 0) {
-        toast.success(`${res.imported} alunas importadas com sucesso!`);
+      if (!res.success) {
+        toast.error("Falha na importacao", { description: res.error });
+        return;
+      }
+
+      setResult(res.data);
+
+      if (res.data.failed === 0) {
+        toast.success(`${res.data.imported} alunas importadas com sucesso!`);
       } else {
-        toast.error(`${res.imported} importadas, ${res.failed} com erro.`);
+        toast.error(`${res.data.imported} importadas, ${res.data.failed} com erro.`);
       }
     } catch {
       toast.error("Erro inesperado na importacao.");

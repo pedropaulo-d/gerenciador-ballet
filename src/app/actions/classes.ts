@@ -13,8 +13,6 @@ import type {
   ClassWithLocation,
 } from "@/types/database";
 
-const supabase = getServiceSupabase();
-
 const uuidSchema = z.string().uuid();
 
 const classInsertSchema = z.object({
@@ -35,6 +33,7 @@ export async function getClassesWithLocation(
   try {
     await requireAuth();
 
+    const supabase = getServiceSupabase();
     let query = supabase
       .from("classes")
       .select("*, location:locations(*)")
@@ -63,6 +62,7 @@ export async function createClass(
     const parsed = classInsertSchema.safeParse(payload);
     if (!parsed.success) return { success: false, error: "Dados da turma invalidos." };
 
+    const supabase = getServiceSupabase();
     const { data, error } = await supabase
       .from("classes")
       .insert(parsed.data)
@@ -90,6 +90,7 @@ export async function updateClass(
     const parsedPayload = classUpdateSchema.safeParse(payload);
     if (!parsedPayload.success) return { success: false, error: "Dados da turma invalidos." };
 
+    const supabase = getServiceSupabase();
     const { data, error } = await supabase
       .from("classes")
       .update(parsedPayload.data)
@@ -112,6 +113,7 @@ export async function deleteClass(id: string): Promise<ActionResult> {
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
 
+    const supabase = getServiceSupabase();
     const { error } = await supabase.from("classes").delete().eq("id", id);
 
     if (error) return { success: false, error: safeDbError(error, "deleteClass") };

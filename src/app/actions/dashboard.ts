@@ -6,8 +6,6 @@ import type { ActionResult } from "@/lib/action-result";
 import { nowBrasilia } from "@/lib/formatters";
 import { safeDbError } from "@/lib/safe-error";
 
-const supabase = getServiceSupabase();
-
 export type BirthdayStudent = {
   id: string;
   fullName: string;
@@ -29,6 +27,7 @@ export async function getTodayBirthdays(): Promise<
   try {
     await requireAuth();
 
+    const supabase = getServiceSupabase();
     const now = nowBrasilia();
     const day = now.getDate();
     const month = now.getMonth() + 1;

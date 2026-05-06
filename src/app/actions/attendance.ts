@@ -10,8 +10,6 @@ import { startPerf } from "@/lib/perf";
 import type { ActionResult } from "@/lib/action-result";
 import type { AttendanceRow, AttendanceStatus } from "@/types/database";
 
-const supabase = getServiceSupabase();
-
 // ---------- Validation ----------
 
 const uuidSchema = z.string().uuid();
@@ -57,6 +55,8 @@ export async function getAttendanceByClassAndDate(
     const parsedDate = isoDateSchema.safeParse(date);
     if (!parsedId.success) return { success: false, error: "ID da turma invalido." };
     if (!parsedDate.success) return { success: false, error: "Data invalida." };
+
+    const supabase = getServiceSupabase();
 
     // 1. Get active enrollments for this class with student name
     const { data: enrollments, error: enrollError } = await supabase
@@ -135,6 +135,8 @@ export async function saveAttendance(
     if (records.length === 0 && removals.length === 0) {
       return { success: false, error: "Nenhum registro para salvar." };
     }
+
+    const supabase = getServiceSupabase();
 
     // Delete cleared records
     if (removals.length > 0) {

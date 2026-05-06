@@ -15,14 +15,12 @@ import type {
   EnrollmentInsert,
 } from "@/types/database";
 
-const supabase = getServiceSupabase();
-
 // ---------- Validation ----------
 
 const uuidSchema = z.string().uuid();
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-const studentInsertSchema = z.object({
+export const studentInsertSchema = z.object({
   full_name: z.string().trim().min(1, "Nome obrigatorio.").max(200),
   birth_date: isoDateSchema.nullish(),
   guardian_name: z.string().trim().min(1, "Nome do responsavel obrigatorio.").max(200),
@@ -73,6 +71,7 @@ export async function getStudentsPaginated(
 
   try {
     await requireAuth();
+    const supabase = getServiceSupabase();
     // When filtering by location or class, we need to find matching student IDs first
     // because Supabase doesn't support filtering parents by nested child relations well.
     let studentIds: string[] | null = null;
@@ -131,9 +130,11 @@ export async function getStudentsPaginated(
     }
 
     // Search across multiple fields
-    // Sanitize: remove PostgREST operator chars to prevent filter injection
+    // Sanitize via allowlist (defesa em profundidade): aceita apenas letras
+    // Unicode, dígitos, espaço, @, ., _ e - — qualquer outro char que possa
+    // virar operador PostgREST (`,`, `:`, `(`, `)`, `*`, `=`, `"`) é cortado.
     if (search && search.trim()) {
-      const sanitized = search.trim().replace(/[,.()"\\]/g, "");
+      const sanitized = search.trim().replace(/[^\p{L}\p{N}\s@._-]/gu, "");
       if (sanitized) {
         const term = `%${sanitized}%`;
         query = query.or(
@@ -178,6 +179,7 @@ export async function createStudentWithEnrollment(
     const parsedEnrollment = enrollmentInsertSchema.safeParse(enrollmentPayload);
     if (!parsedEnrollment.success) return { success: false, error: "Dados da matricula invalidos." };
 
+    const supabase = getServiceSupabase();
     const { data: student, error: studentError } = await supabase
       .from("students")
       .insert(parsedStudent.data)
@@ -218,6 +220,7 @@ export async function updateStudent(
     const parsedPayload = studentUpdateSchema.safeParse(payload);
     if (!parsedPayload.success) return { success: false, error: "Dados da aluna invalidos." };
 
+    const supabase = getServiceSupabase();
     const { data, error } = await supabase
       .from("students")
       .update(parsedPayload.data)
@@ -240,6 +243,7 @@ export async function deleteStudent(id: string): Promise<ActionResult> {
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
 
+    const supabase = getServiceSupabase();
     const { error } = await supabase.from("students").delete().eq("id", id);
 
     if (error) return { success: false, error: safeDbError(error, "deleteStudent") };
@@ -273,6 +277,7 @@ export async function deleteStudents(
       return { success: false, error: "ID de aluna invalido." };
     }
 
+    const supabase = getServiceSupabase();
     const { error, count } = await supabase
       .from("students")
       .delete({ count: "exact" })

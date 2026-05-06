@@ -8,8 +8,6 @@ import { safeDbError } from "@/lib/safe-error";
 import type { ActionResult } from "@/lib/action-result";
 import type { Location, LocationInsert, LocationUpdate } from "@/types/database";
 
-const supabase = getServiceSupabase();
-
 const uuidSchema = z.string().uuid();
 
 const locationInsertSchema = z.object({
@@ -25,6 +23,7 @@ export async function getLocations(): Promise<ActionResult<Location[]>> {
   try {
     await requireAdmin();
 
+    const supabase = getServiceSupabase();
     const { data, error } = await supabase
       .from("locations")
       .select("*")
@@ -46,6 +45,7 @@ export async function createLocation(
     const parsed = locationInsertSchema.safeParse(payload);
     if (!parsed.success) return { success: false, error: "Dados do local invalidos." };
 
+    const supabase = getServiceSupabase();
     const { data, error } = await supabase
       .from("locations")
       .insert(parsed.data)
@@ -73,6 +73,7 @@ export async function updateLocation(
     const parsedPayload = locationUpdateSchema.safeParse(payload);
     if (!parsedPayload.success) return { success: false, error: "Dados do local invalidos." };
 
+    const supabase = getServiceSupabase();
     const { data, error } = await supabase
       .from("locations")
       .update(parsedPayload.data)
@@ -95,6 +96,7 @@ export async function deleteLocation(id: string): Promise<ActionResult> {
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID do local invalido." };
 
+    const supabase = getServiceSupabase();
     const { error } = await supabase.from("locations").delete().eq("id", id);
 
     if (error) return { success: false, error: safeDbError(error, "deleteLocation") };

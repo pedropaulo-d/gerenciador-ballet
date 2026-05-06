@@ -7,8 +7,7 @@ import { unwrapJoin } from "@/lib/supabase-helpers";
 import { computeEnrollmentDates } from "@/lib/enrollment-utils";
 import type { ActionResult } from "@/lib/action-result";
 import { normalize, type ClassLookupEntry, type CsvRow } from "@/lib/csv-import";
-
-const supabase = getServiceSupabase();
+import { studentInsertSchema } from "@/app/actions/students";
 
 export type ImportRowResult = {
   row: number;
@@ -54,6 +53,7 @@ export async function getClassesForImport(): Promise<
   try {
     await requireAdmin();
 
+    const supabase = getServiceSupabase();
     const { data, error } = await supabase
       .from("classes")
       .select("id, name, location:locations(name)")
@@ -89,84 +89,87 @@ export async function getClassesForImport(): Promise<
 export async function importStudentsFromCsv(
   rows: CsvRow[],
   classMap: Record<string, string>,
-): Promise<ImportResult> {
-  await requireAdmin();
+): Promise<ActionResult<ImportResult>> {
+  try {
+    await requireAdmin();
 
-  const results: ImportRowResult[] = [];
-  let imported = 0;
-  let failed = 0;
+    const supabase = getServiceSupabase();
 
-  const { data: existingStudents } = await supabase
-    .from("students")
-    .select("full_name");
+    const results: ImportRowResult[] = [];
+    let imported = 0;
+    let failed = 0;
 
-  const existingNames = new Set(
-    (existingStudents ?? []).map((s: { full_name: string }) =>
-      normalize(s.full_name),
-    ),
-  );
+    const { data: existingStudents } = await supabase
+      .from("students")
+      .select("full_name");
 
-  const { data: validClasses } = await supabase.from("classes").select("id");
-  const validClassIds = new Set(
-    (validClasses ?? []).map((c: { id: string }) => c.id),
-  );
+    const existingNames = new Set(
+      (existingStudents ?? []).map((s: { full_name: string }) =>
+        normalize(s.full_name),
+      ),
+    );
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const studentName = (row["NOME DA ALUNA"] || "").trim();
-    const rowNum = i + 1;
+    const { data: validClasses } = await supabase.from("classes").select("id");
+    const validClassIds = new Set(
+      (validClasses ?? []).map((c: { id: string }) => c.id),
+    );
 
-    if (!studentName) {
-      results.push({
-        row: rowNum,
-        studentName: "(vazio)",
-        success: false,
-        error: "Nome da aluna vazio, linha ignorada.",
-      });
-      failed++;
-      continue;
-    }
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const studentName = (row["NOME DA ALUNA"] || "").trim();
+      const rowNum = i + 1;
 
-    if (existingNames.has(normalize(studentName))) {
-      results.push({
-        row: rowNum,
-        studentName,
-        success: false,
-        error: "Aluna já cadastrada, ignorada.",
-      });
-      failed++;
-      continue;
-    }
-
-    try {
-      const turmaRaw = (row["TURMA"] || "").trim();
-      const classId = classMap[turmaRaw];
-
-      if (!classId) {
+      if (!studentName) {
         results.push({
           row: rowNum,
-          studentName,
+          studentName: "(vazio)",
           success: false,
-          error: `Turma "${turmaRaw}" não foi mapeada na etapa de confirmação.`,
+          error: "Nome da aluna vazio, linha ignorada.",
         });
         failed++;
         continue;
       }
 
-      if (!validClassIds.has(classId)) {
+      if (existingNames.has(normalize(studentName))) {
         results.push({
           row: rowNum,
           studentName,
           success: false,
-          error: "ID de turma inválido.",
+          error: "Aluna já cadastrada, ignorada.",
         });
         failed++;
         continue;
       }
 
-      const { data: student, error: studentError } = await supabase
-        .from("students")
-        .insert({
+      try {
+        const turmaRaw = (row["TURMA"] || "").trim();
+        const classId = classMap[turmaRaw];
+
+        if (!classId) {
+          results.push({
+            row: rowNum,
+            studentName,
+            success: false,
+            error: `Turma "${turmaRaw}" não foi mapeada na etapa de confirmação.`,
+          });
+          failed++;
+          continue;
+        }
+
+        if (!validClassIds.has(classId)) {
+          results.push({
+            row: rowNum,
+            studentName,
+            success: false,
+            error: "ID de turma inválido.",
+          });
+          failed++;
+          continue;
+        }
+
+        // Valida via mesmo schema usado em createStudentWithEnrollment para
+        // evitar dados sujos (emails malformados, CPF gigante, strings sem limite).
+        const studentPayload = {
           full_name: studentName,
           guardian_name: (row["NOME DO RESPONSAVEL"] || "").trim(),
           guardian_email: (row["EMAIL"] || "").trim() || null,
@@ -174,63 +177,90 @@ export async function importStudentsFromCsv(
           guardian_cpf: (row["CPF ou CNPJ"] || "").trim() || null,
           is_internal: parseIsInternal(row["TIPO DE ALUNA"] || ""),
           is_active: true,
-        })
-        .select("id")
-        .single();
+        };
 
-      if (studentError || !student) {
+        const parsedStudent = studentInsertSchema.safeParse(studentPayload);
+        if (!parsedStudent.success) {
+          results.push({
+            row: rowNum,
+            studentName,
+            success: false,
+            error: `Dados inválidos: ${parsedStudent.error.issues[0]?.message ?? "campo invalido"}`,
+          });
+          failed++;
+          continue;
+        }
+
+        const { data: student, error: studentError } = await supabase
+          .from("students")
+          .insert(parsedStudent.data)
+          .select("id")
+          .single();
+
+        if (studentError || !student) {
+          results.push({
+            row: rowNum,
+            studentName,
+            success: false,
+            error: `Erro ao inserir aluna: ${safeDbError(studentError, "importStudents:student")}`,
+          });
+          failed++;
+          continue;
+        }
+
+        const validityType = parseValidityType(row["PLANO"] || "");
+        const { startsAt, endsAt } = computeEnrollmentDates(validityType);
+
+        const { error: enrollmentError } = await supabase
+          .from("enrollments")
+          .insert({
+            student_id: student.id,
+            class_id: classId,
+            status: "active",
+            validity_type: validityType,
+            starts_at: startsAt,
+            ends_at: endsAt,
+            base_fee: parseCurrency(row["MENSALIDADE"] || ""),
+            due_day: 5,
+          });
+
+        if (enrollmentError) {
+          await supabase.from("students").delete().eq("id", student.id);
+          results.push({
+            row: rowNum,
+            studentName,
+            success: false,
+            error: `Erro ao criar matrícula: ${safeDbError(enrollmentError, "importStudents:enrollment")}`,
+          });
+          failed++;
+          continue;
+        }
+
+        existingNames.add(normalize(studentName));
+        results.push({ row: rowNum, studentName, success: true });
+        imported++;
+      } catch (err) {
+        console.error("[importStudents:unexpected]", err);
         results.push({
           row: rowNum,
           studentName,
           success: false,
-          error: `Erro ao inserir aluna: ${safeDbError(studentError, "importStudents:student")}`,
+          error: "Erro inesperado ao processar esta linha.",
         });
         failed++;
-        continue;
       }
-
-      const validityType = parseValidityType(row["PLANO"] || "");
-      const { startsAt, endsAt } = computeEnrollmentDates(validityType);
-
-      const { error: enrollmentError } = await supabase
-        .from("enrollments")
-        .insert({
-          student_id: student.id,
-          class_id: classId,
-          status: "active",
-          validity_type: validityType,
-          starts_at: startsAt,
-          ends_at: endsAt,
-          base_fee: parseCurrency(row["MENSALIDADE"] || ""),
-          due_day: 5,
-        });
-
-      if (enrollmentError) {
-        await supabase.from("students").delete().eq("id", student.id);
-        results.push({
-          row: rowNum,
-          studentName,
-          success: false,
-          error: `Erro ao criar matrícula: ${safeDbError(enrollmentError, "importStudents:enrollment")}`,
-        });
-        failed++;
-        continue;
-      }
-
-      existingNames.add(normalize(studentName));
-      results.push({ row: rowNum, studentName, success: true });
-      imported++;
-    } catch (err) {
-      console.error("[importStudents:unexpected]", err);
-      results.push({
-        row: rowNum,
-        studentName,
-        success: false,
-        error: "Erro inesperado ao processar esta linha.",
-      });
-      failed++;
     }
-  }
 
-  return { total: rows.length, imported, failed, results };
+    return {
+      success: true,
+      data: { total: rows.length, imported, failed, results },
+    };
+  } catch (e) {
+    return (
+      handleAuthError<ImportResult>(e) ?? {
+        success: false,
+        error: "Falha ao importar alunas.",
+      }
+    );
+  }
 }

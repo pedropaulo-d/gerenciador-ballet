@@ -12,8 +12,6 @@ import { nowBrasilia } from "@/lib/formatters";
 import type { ActionResult } from "@/lib/action-result";
 import type { MonthlyFeeWithDetails } from "@/types/database";
 
-const supabase = getServiceSupabase();
-
 // ---------- Validation Schemas ----------
 
 const uuidSchema = z.string().uuid();
@@ -95,8 +93,10 @@ export async function getFinancialByMonth(
     if (filters?.locationId && !uuidSchema.safeParse(filters.locationId).success) return { success: false, error: "ID do local invalido." };
     if (filters?.classId && !uuidSchema.safeParse(filters.classId).success) return { success: false, error: "ID da turma invalido." };
 
+    const supabase = getServiceSupabase();
+
     // Auto-mark overdue fees before fetching
-    await markOverdueFees(referenceMonth);
+    await markOverdueFees(supabase, referenceMonth);
 
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
@@ -107,7 +107,9 @@ export async function getFinancialByMonth(
     let enrollmentIds: string[] | null = null;
 
     if (filters?.search) {
-      const sanitized = filters.search.trim().replace(/[,.()"\\]/g, "");
+      // Allowlist (defesa em profundidade): aceita apenas letras Unicode,
+      // dígitos, espaço, @, ., _ e -. Bloqueia operadores PostgREST.
+      const sanitized = filters.search.trim().replace(/[^\p{L}\p{N}\s@._-]/gu, "");
       if (sanitized) {
         const term = `%${sanitized}%`;
         const { data: matchingStudents } = await supabase
@@ -177,7 +179,7 @@ export async function getFinancialByMonth(
     if (enrollmentIds !== null) {
       if (enrollmentIds.length === 0) {
         // No matching enrollments — return empty with zeroed summary
-        const summary = await computeSummary(referenceMonth, enrollmentIds);
+        const summary = await computeSummary(supabase, referenceMonth, enrollmentIds);
         return { success: true, data: { fees: [], total: 0, summary } };
       }
       query = query.in("enrollment_id", enrollmentIds);
@@ -193,7 +195,7 @@ export async function getFinancialByMonth(
 
     // Summary uses a separate query for totals (all fees, not just current page)
     // Pass enrollmentIds so summary respects location/class filters
-    const summary = await computeSummary(referenceMonth, enrollmentIds);
+    const summary = await computeSummary(supabase, referenceMonth, enrollmentIds);
 
     return {
       success: true,
@@ -206,10 +208,12 @@ export async function getFinancialByMonth(
   }
 }
 
+type ServiceClient = ReturnType<typeof getServiceSupabase>;
+
 /**
  * Auto-mark pending fees as overdue when current date > due_day of reference month.
  */
-async function markOverdueFees(referenceMonth: string): Promise<void> {
+async function markOverdueFees(supabase: ServiceClient, referenceMonth: string): Promise<void> {
   const now = nowBrasilia();
   const [year, month] = referenceMonth.split("-").map(Number);
 
@@ -249,6 +253,7 @@ async function markOverdueFees(referenceMonth: string): Promise<void> {
  * this ensures KPIs recalculate when filtering by location or class.
  */
 async function computeSummary(
+  supabase: ServiceClient,
   referenceMonth: string,
   enrollmentIds: string[] | null = null,
 ): Promise<FinancialSummary> {
@@ -306,6 +311,8 @@ export async function generateFeesForMonth(
 
     const parsed = referenceMonthSchema.safeParse(referenceMonth);
     if (!parsed.success) return { success: false, error: "Mes de referencia invalido." };
+
+    const supabase = getServiceSupabase();
 
     // Fetch active enrollments with location fee data
     const { data: enrollments, error: enrollError } = await supabase
@@ -388,6 +395,8 @@ export async function undoPayment(
     const parsedId = uuidSchema.safeParse(feeId);
     if (!parsedId.success) return { success: false, error: "ID da mensalidade invalido." };
 
+    const supabase = getServiceSupabase();
+
     // Fetch enrollment data to restore the original gross_amount and to
     // compute whether the fee is past its due date.
     const { data: fee, error: fetchError } = await supabase
@@ -454,6 +463,7 @@ export async function deleteMonthlyFees(
       return { success: false, error: "ID de mensalidade invalido." };
     }
 
+    const supabase = getServiceSupabase();
     const { error, count } = await supabase
       .from("monthly_fees")
       .delete({ count: "exact" })
@@ -488,6 +498,7 @@ export async function payFeeManually(
     // Clamp to 2 decimal places to match numeric(10,2) in the database
     const sanitized = Math.round(receivedAmount * 100) / 100;
 
+    const supabase = getServiceSupabase();
     const { error } = await supabase
       .from("monthly_fees")
       .update({
@@ -538,6 +549,8 @@ export async function payFeesBatchManually(
     }
 
     const paidAtIso = new Date(`${paymentDate}T12:00:00-03:00`).toISOString();
+
+    const supabase = getServiceSupabase();
 
     let paid = 0;
     for (const p of parsed.data) {
@@ -602,6 +615,8 @@ export async function undoPaymentsBatch(
     if (!parsedIds.success) {
       return { success: false, error: "ID de mensalidade invalido." };
     }
+
+    const supabase = getServiceSupabase();
 
     // Fetch only fees that are currently paid — defensive against stale UI
     const { data: rows, error: fetchError } = await supabase
