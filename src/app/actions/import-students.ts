@@ -7,7 +7,7 @@ import { unwrapJoin } from "@/lib/supabase-helpers";
 import { computeEnrollmentDates } from "@/lib/enrollment-utils";
 import type { ActionResult } from "@/lib/action-result";
 import { normalize, type ClassLookupEntry, type CsvRow } from "@/lib/csv-import";
-import { studentInsertSchema } from "@/app/actions/students";
+import { studentInsertSchema } from "@/lib/student-schemas";
 
 export type ImportRowResult = {
   row: number;

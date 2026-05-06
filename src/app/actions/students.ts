@@ -7,6 +7,7 @@ import { requireAuth, requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
 import { startPerf } from "@/lib/perf";
+import { studentInsertSchema } from "@/lib/student-schemas";
 import type {
   Student,
   StudentInsert,
@@ -19,18 +20,6 @@ import type {
 
 const uuidSchema = z.string().uuid();
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-
-export const studentInsertSchema = z.object({
-  full_name: z.string().trim().min(1, "Nome obrigatorio.").max(200),
-  birth_date: isoDateSchema.nullish(),
-  guardian_name: z.string().trim().min(1, "Nome do responsavel obrigatorio.").max(200),
-  guardian_phone: z.string().max(30).nullish(),
-  guardian_email: z.string().email().max(200).nullish().or(z.literal("")).transform(v => v || null),
-  guardian_cpf: z.string().max(20).nullish(),
-  is_internal: z.boolean(),
-  notes: z.string().max(2000).nullish(),
-  is_active: z.boolean(),
-});
 
 const enrollmentInsertSchema = z.object({
   class_id: uuidSchema,
