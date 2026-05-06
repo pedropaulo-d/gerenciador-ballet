@@ -19,7 +19,10 @@
       "Bash(xargs wc *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "Bash(npm audit *)",
+      "Bash(git rm *)",
+      "Bash(grep -i \".csv$\")"
     ]
   }
 }
