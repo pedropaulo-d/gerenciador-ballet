@@ -24,6 +24,12 @@
 .DS_Store
 *.pem
 
+# data files (PII risk — bloqueia imports/exports brutos)
+# se precisar versionar uma fixture, adicione com: !path/to/fixture.csv
+*.csv
+*.xlsx
+*.xls
+
 # debug
 npm-debug.log*
 yarn-debug.log*
