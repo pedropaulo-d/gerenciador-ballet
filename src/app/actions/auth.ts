@@ -19,10 +19,19 @@ export async function signIn(
     return { success: false, error: parsed.error.issues[0].message };
   }
 
+  // Cloudflare Turnstile: token obrigatorio quando o captcha esta habilitado
+  // no painel Supabase. Em dev, sem captcha configurado, formData nao traz
+  // o token e o Supabase aceita o login normal — operacao all-or-nothing
+  // controlada do lado do servidor Supabase.
+  const captchaToken = formData.get('captchaToken');
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
+    options: typeof captchaToken === 'string' && captchaToken
+      ? { captchaToken }
+      : undefined,
   });
 
   if (error) {

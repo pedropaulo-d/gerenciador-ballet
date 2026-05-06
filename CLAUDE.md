@@ -32,6 +32,8 @@ Este arquivo dita COMO o codigo deve ser escrito. Padroes anteriores (client fet
 - Roles: `admin` (total) / `teacher` (Home sem metricas financeiras, Alunas sem financeiro, Chamadas)
 - Teacher BLOQUEADO em `/finances`, `/locations`, `/classes`, `/admin`
 - Default ao criar usuario: `teacher` (seguranca por padrao)
+- **Escopo de teacher**: NAO ha autorizacao por turma/local — qualquer teacher autenticada pode salvar chamada de qualquer turma e ler perfil de qualquer aluna. Decisao consciente para a operacao atual (1 admin + 1 teacher cobrindo todas as creches). Se o quadro crescer, modelar `teacher_assignments(profile_id, location_id)` e filtrar `enrollment.class.location_id` em `saveAttendance`/`getStudentSummary`.
+- **Captcha no login**: Cloudflare Turnstile via integracao nativa do Supabase Auth. Habilitar em `Authentication → Bot/Abuse Protection → CAPTCHA = Turnstile` e setar `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Sem a env var, o widget nao renderiza (DX em dev); em prod, o servidor Supabase rejeita `signInWithPassword` sem o token quando o painel esta com captcha ON. `actions/auth.ts:signIn` repassa o token via `options.captchaToken`.
 
 ## Data Fetching — Pure SSR (OBRIGATORIO)
 
