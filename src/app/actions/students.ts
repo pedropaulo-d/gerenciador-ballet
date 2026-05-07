@@ -8,6 +8,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { safeDbError } from "@/lib/safe-error";
 import { startPerf } from "@/lib/perf";
 import { studentInsertSchema } from "@/lib/student-schemas";
+import { computeEnrollmentDates } from "@/lib/enrollment-utils";
 import type {
   Student,
   StudentInsert,
@@ -196,9 +197,19 @@ export async function createStudentWithEnrollment(
   }
 }
 
-export async function updateStudent(
+// Enrollment fields editable from the student edit dialog. Dates are derived
+// server-side from `validity_type` (kept as-is when the plan didn't change).
+const enrollmentEditSchema = z.object({
+  class_id: uuidSchema,
+  validity_type: z.enum(["semester", "annual"]),
+  base_fee: z.number().nonnegative().max(99_999_999.99),
+  due_day: z.union([z.literal(5), z.literal(7)]),
+});
+
+export async function updateStudentWithEnrollment(
   id: string,
-  payload: StudentUpdate
+  studentPayload: StudentUpdate,
+  enrollmentPayload: z.infer<typeof enrollmentEditSchema>
 ): Promise<ActionResult<Student>> {
   try {
     await requireAdmin();
@@ -206,20 +217,89 @@ export async function updateStudent(
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) return { success: false, error: "ID da aluna invalido." };
 
-    const parsedPayload = studentUpdateSchema.safeParse(payload);
-    if (!parsedPayload.success) return { success: false, error: "Dados da aluna invalidos." };
+    const parsedStudent = studentUpdateSchema.safeParse(studentPayload);
+    if (!parsedStudent.success) return { success: false, error: "Dados da aluna invalidos." };
+
+    const parsedEnrollment = enrollmentEditSchema.safeParse(enrollmentPayload);
+    if (!parsedEnrollment.success) return { success: false, error: "Dados da matricula invalidos." };
 
     const supabase = getServiceSupabase();
-    const { data, error } = await supabase
+
+    const { data: student, error: studentError } = await supabase
       .from("students")
-      .update(parsedPayload.data)
+      .update(parsedStudent.data)
       .eq("id", id)
       .select()
       .single();
 
-    if (error) return { success: false, error: safeDbError(error, "updateStudent") };
+    if (studentError) return { success: false, error: safeDbError(studentError, "updateStudentWithEnrollment:student") };
+
+    // Resolve which enrollment to edit. Prefer the active one; fall back to
+    // the most recently created so the dialog can still recover a student
+    // that lost its active enrollment somehow.
+    const { data: activeEnrollments, error: activeLookupError } = await supabase
+      .from("enrollments")
+      .select("id, validity_type, starts_at, ends_at")
+      .eq("student_id", id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (activeLookupError) return { success: false, error: safeDbError(activeLookupError, "updateStudentWithEnrollment:lookup") };
+
+    let target = activeEnrollments?.[0] ?? null;
+    if (!target) {
+      const { data: anyEnrollments, error: anyLookupError } = await supabase
+        .from("enrollments")
+        .select("id, validity_type, starts_at, ends_at")
+        .eq("student_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (anyLookupError) return { success: false, error: safeDbError(anyLookupError, "updateStudentWithEnrollment:lookup-any") };
+      target = anyEnrollments?.[0] ?? null;
+    }
+
+    // When the plan changes (semester <-> annual) recompute both dates from
+    // "now" — same convention used at creation. Otherwise preserve the
+    // historical starts_at/ends_at to avoid drifting the cycle.
+    const planChanged = !target || target.validity_type !== parsedEnrollment.data.validity_type;
+    const dates = planChanged
+      ? computeEnrollmentDates(parsedEnrollment.data.validity_type)
+      : { startsAt: target!.starts_at, endsAt: target!.ends_at };
+
+    if (target) {
+      const { error: updateError } = await supabase
+        .from("enrollments")
+        .update({
+          class_id: parsedEnrollment.data.class_id,
+          validity_type: parsedEnrollment.data.validity_type,
+          base_fee: parsedEnrollment.data.base_fee,
+          due_day: parsedEnrollment.data.due_day,
+          starts_at: dates.startsAt,
+          ends_at: dates.endsAt,
+        })
+        .eq("id", target.id);
+
+      if (updateError) return { success: false, error: safeDbError(updateError, "updateStudentWithEnrollment:enrollment-update") };
+    } else {
+      const { error: insertError } = await supabase
+        .from("enrollments")
+        .insert({
+          student_id: id,
+          status: "active",
+          class_id: parsedEnrollment.data.class_id,
+          validity_type: parsedEnrollment.data.validity_type,
+          base_fee: parsedEnrollment.data.base_fee,
+          due_day: parsedEnrollment.data.due_day,
+          starts_at: dates.startsAt,
+          ends_at: dates.endsAt,
+        });
+
+      if (insertError) return { success: false, error: safeDbError(insertError, "updateStudentWithEnrollment:enrollment-insert") };
+    }
+
     revalidatePath("/students");
-    return { success: true, data: data as Student };
+    return { success: true, data: student as Student };
   } catch (e) {
     return handleAuthError(e) ?? { success: false, error: "Falha ao atualizar aluna." };
   }

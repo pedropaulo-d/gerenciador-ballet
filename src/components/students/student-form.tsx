@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { Student, ClassWithLocation } from "@/types/database";
+import type {
+  ClassWithLocation,
+  StudentWithEnrollments,
+} from "@/types/database";
 import { computeEnrollmentDates } from "@/lib/enrollment-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +28,7 @@ export type StudentFormData = {
   guardian_cpf: string;
   is_internal: boolean;
   notes: string;
-  // Enrollment fields (only for creation)
+  // Enrollment fields — populated in both create and edit modes.
   class_id: string;
   validity_type: "semester" | "annual";
   base_fee: string;
@@ -47,7 +50,20 @@ const emptyForm: StudentFormData = {
   due_day: "5",
 };
 
-export function studentToFormData(student: Student): StudentFormData {
+export function studentToFormData(student: StudentWithEnrollments): StudentFormData {
+  // Mesma heuristica do server-side update: matricula ativa mais recente, ou,
+  // como fallback defensivo, a mais recente de qualquer status. O profile
+  // sheet, attendance e o dashboard ja assumem 1 matricula ativa por aluna.
+  const activeEnrollments = student.enrollments.filter((e) => e.status === "active");
+  const sortByCreatedAtDesc = (a: { created_at: string }, b: { created_at: string }) =>
+    b.created_at.localeCompare(a.created_at);
+  const enrollment =
+    [...activeEnrollments].sort(sortByCreatedAtDesc)[0] ??
+    [...student.enrollments].sort(sortByCreatedAtDesc)[0] ??
+    null;
+
+  const dueDay: "5" | "7" = enrollment?.due_day === 7 ? "7" : "5";
+
   return {
     full_name: student.full_name,
     birth_date: student.birth_date ?? "",
@@ -57,11 +73,10 @@ export function studentToFormData(student: Student): StudentFormData {
     guardian_cpf: student.guardian_cpf ?? "",
     is_internal: student.is_internal,
     notes: student.notes ?? "",
-    // Not used in edit mode
-    class_id: "",
-    validity_type: "semester",
-    base_fee: "",
-    due_day: "5",
+    class_id: enrollment?.class_id ?? "",
+    validity_type: enrollment?.validity_type ?? "semester",
+    base_fee: enrollment ? String(enrollment.base_fee) : "",
+    due_day: dueDay,
   };
 }
 
@@ -93,6 +108,17 @@ export function formDataToEnrollmentPayload(form: StudentFormData) {
   };
 }
 
+// Edit-only payload: o servidor decide preservar ou recomputar as datas com
+// base na matricula existente, entao o cliente nao envia starts_at/ends_at.
+export function formDataToEnrollmentEditPayload(form: StudentFormData) {
+  return {
+    class_id: form.class_id,
+    validity_type: form.validity_type,
+    base_fee: parseFloat(form.base_fee) || 0,
+    due_day: (parseInt(form.due_day) === 7 ? 7 : 5) as 5 | 7,
+  };
+}
+
 interface StudentFormProps {
   classes: ClassWithLocation[];
   initialData?: StudentFormData;
@@ -112,7 +138,8 @@ export function StudentForm({
   const isValid =
     form.full_name.trim() &&
     form.guardian_name.trim() &&
-    (isEditing || (form.class_id && form.base_fee));
+    form.class_id &&
+    form.base_fee;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -208,91 +235,87 @@ export function StudentForm({
         </Select>
       </div>
 
-      {/* Enrollment section — only shown on creation */}
-      {!isEditing && (
-        <>
-          <div className="border-t pt-3">
-            <p className="text-sm font-medium text-muted-foreground mb-2">
-              Matrícula
-            </p>
-          </div>
+      {/* Enrollment section — exibida em criacao e edicao */}
+      <div className="border-t pt-3">
+        <p className="text-sm font-medium text-muted-foreground mb-2">
+          Matrícula
+        </p>
+      </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Turma *</Label>
-            <Select
-              value={form.class_id}
-              onValueChange={(v) => setForm({ ...form, class_id: v })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione a turma" />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.map((cls) => (
-                  <SelectItem key={cls.id} value={cls.id}>
-                    {cls.name} — {cls.location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Turma *</Label>
+        <Select
+          value={form.class_id}
+          onValueChange={(v) => setForm({ ...form, class_id: v })}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Selecione a turma" />
+          </SelectTrigger>
+          <SelectContent>
+            {classes.map((cls) => (
+              <SelectItem key={cls.id} value={cls.id}>
+                {cls.name} — {cls.location.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label>Plano *</Label>
-              <Select
-                value={form.validity_type}
-                onValueChange={(v) =>
-                  setForm({
-                    ...form,
-                    validity_type: v as "semester" | "annual",
-                  })
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semester">Semestral</SelectItem>
-                  <SelectItem value="annual">Anual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="base-fee">Valor Base (R$) *</Label>
-              <Input
-                id="base-fee"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="150.00"
-                value={form.base_fee}
-                onChange={(e) =>
-                  setForm({ ...form, base_fee: e.target.value })
-                }
-                required
-              />
-            </div>
-          </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label>Plano *</Label>
+          <Select
+            value={form.validity_type}
+            onValueChange={(v) =>
+              setForm({
+                ...form,
+                validity_type: v as "semester" | "annual",
+              })
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="semester">Semestral</SelectItem>
+              <SelectItem value="annual">Anual</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="base-fee">Valor Base (R$) *</Label>
+          <Input
+            id="base-fee"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="150.00"
+            value={form.base_fee}
+            onChange={(e) =>
+              setForm({ ...form, base_fee: e.target.value })
+            }
+            required
+          />
+        </div>
+      </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Dia de vencimento *</Label>
-            <Select
-              value={form.due_day}
-              onValueChange={(v) =>
-                setForm({ ...form, due_day: v as "5" | "7" })
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">Dia 05</SelectItem>
-                <SelectItem value="7">Dia 07</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </>
-      )}
+      <div className="flex flex-col gap-1.5">
+        <Label>Dia de vencimento *</Label>
+        <Select
+          value={form.due_day}
+          onValueChange={(v) =>
+            setForm({ ...form, due_day: v as "5" | "7" })
+          }
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="5">Dia 05</SelectItem>
+            <SelectItem value="7">Dia 07</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="notes">Observações</Label>

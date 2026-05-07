@@ -10,13 +10,14 @@ import type {
 } from "@/types/database";
 import {
   createStudentWithEnrollment,
-  updateStudent,
+  updateStudentWithEnrollment,
   deleteStudent,
   deleteStudents,
 } from "@/app/actions/students";
 import {
   formDataToStudentPayload,
   formDataToEnrollmentPayload,
+  formDataToEnrollmentEditPayload,
   type StudentFormData,
 } from "@/components/students/student-form";
 import { StudentFilters } from "@/components/students/student-filters";
@@ -110,9 +111,10 @@ export function StudentList({
 
   async function handleFormSubmit(formData: StudentFormData) {
     if (editingStudent) {
-      const result = await updateStudent(
+      const result = await updateStudentWithEnrollment(
         editingStudent.id,
-        formDataToStudentPayload(formData)
+        formDataToStudentPayload(formData),
+        formDataToEnrollmentEditPayload(formData)
       );
       if (!result.success) {
         toast.error("Erro ao salvar aluna", { description: result.error });
