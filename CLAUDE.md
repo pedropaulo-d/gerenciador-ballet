@@ -71,7 +71,7 @@ Este arquivo dita COMO o codigo deve ser escrito. Padroes anteriores (client fet
 
 ## Helpers compartilhados (DRY de conhecimento)
 
-- `lib/financial-utils.ts` — `computeDueDate(referenceMonth, dueDay)` (decisao overdue vs pending)
+- `lib/financial-utils.ts` — `isFeeOverdue(referenceMonth, dueDay)` (compara `todayISO()` com a data de vencimento como string YYYY-MM-DD; "no proprio dia ainda e Pendente")
 - `lib/enrollment-utils.ts` — `computeEnrollmentDates(validityType)` (start + end com year rollover correto)
 - `lib/supabase-helpers.ts` — `unwrapJoin(value)` para joins PostgREST que retornam objeto-vs-array
 - `lib/role-resolver.ts` — `resolveRole` compartilhado por middleware (Edge) e auth-guard (server actions)
@@ -116,7 +116,7 @@ src/
 │   ├── use-url-params.ts      # URL = source of truth
 │   ├── formatters.ts    # moeda, datas (timezone Brasilia)
 │   ├── csv-import.ts    # parsing puro CSV (importavel cliente/servidor)
-│   ├── financial-utils.ts     # computeDueDate
+│   ├── financial-utils.ts     # isFeeOverdue
 │   ├── enrollment-utils.ts    # computeEnrollmentDates
 │   └── supabase-helpers.ts    # unwrapJoin
 ├── middleware.ts

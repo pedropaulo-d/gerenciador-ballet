@@ -5,10 +5,9 @@ import { revalidatePath } from "next/cache";
 import { getServiceSupabase } from "@/lib/supabase";
 import { requireAdmin, handleAuthError } from "@/lib/auth-guard";
 import { safeDbError } from "@/lib/safe-error";
-import { computeDueDate } from "@/lib/financial-utils";
+import { isFeeOverdue } from "@/lib/financial-utils";
 import { unwrapJoin } from "@/lib/supabase-helpers";
 import { startPerf } from "@/lib/perf";
-import { nowBrasilia } from "@/lib/formatters";
 import type { ActionResult } from "@/lib/action-result";
 import type { MonthlyFeeWithDetails } from "@/types/database";
 
@@ -211,16 +210,11 @@ export async function getFinancialByMonth(
 type ServiceClient = ReturnType<typeof getServiceSupabase>;
 
 /**
- * Auto-mark pending fees as overdue when current date > due_day of reference month.
+ * Auto-mark pending fees as overdue when today (BR) > due_day of reference
+ * month. `isFeeOverdue` ja trata mes futuro (compara strings ISO), entao nao
+ * precisamos do early-return baseado em refDate.
  */
 async function markOverdueFees(supabase: ServiceClient, referenceMonth: string): Promise<void> {
-  const now = nowBrasilia();
-  const [year, month] = referenceMonth.split("-").map(Number);
-
-  // Only mark overdue if we're in or past the reference month
-  const refDate = new Date(year, month - 1, 1);
-  if (now < refDate) return;
-
   // Get pending fees for this month with their enrollment's due_day
   const { data: pendingFees } = await supabase
     .from("monthly_fees")
@@ -233,8 +227,7 @@ async function markOverdueFees(supabase: ServiceClient, referenceMonth: string):
   const overdueIds: string[] = [];
   for (const fee of pendingFees as PendingFeeRow[]) {
     const dueDay = unwrapJoin(fee.enrollment)?.due_day ?? 5;
-    const dueDate = computeDueDate(referenceMonth, dueDay);
-    if (now > dueDate) {
+    if (isFeeOverdue(referenceMonth, dueDay)) {
       overdueIds.push(fee.id);
     }
   }
@@ -418,8 +411,9 @@ export async function undoPayment(
     const baseFee = Number(enrollment?.base_fee ?? 0);
     const dueDay = enrollment?.due_day ?? 5;
 
-    const dueDate = computeDueDate(fee.reference_month as string, dueDay);
-    const newStatus = nowBrasilia() > dueDate ? "overdue" : "pending";
+    const newStatus = isFeeOverdue(fee.reference_month as string, dueDay)
+      ? "overdue"
+      : "pending";
 
     // Reset payment fields but PRESERVE location_fee (set at generation time).
     // Zeroing location_fee would corrupt net_amount on subsequent payments.
@@ -644,7 +638,6 @@ export async function undoPaymentsBatch(
       }
     }
 
-    const now = nowBrasilia();
     const undoneIds: string[] = [];
     const failedIds: string[] = [];
 
@@ -655,8 +648,9 @@ export async function undoPaymentsBatch(
         continue;
       }
 
-      const dueDate = computeDueDate(data.referenceMonth, data.dueDay);
-      const newStatus = now > dueDate ? "overdue" : "pending";
+      const newStatus = isFeeOverdue(data.referenceMonth, data.dueDay)
+        ? "overdue"
+        : "pending";
 
       const { error } = await supabase
         .from("monthly_fees")

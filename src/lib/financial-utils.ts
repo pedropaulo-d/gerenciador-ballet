@@ -1,8 +1,13 @@
+import { todayISO } from "./formatters";
+
 /**
- * Last second of `dueDay` in the month identified by `referenceMonth` (YYYY-MM-DD).
- * Used to decide overdue vs pending: any moment past this Date counts as overdue.
+ * Decide se uma mensalidade ja virou Vencida com base na regra de negocio:
+ * "no proprio dia do vencimento a cobranca ainda e Pendente; soma vira
+ * Vencida no dia seguinte". Comparacao feita em strings YYYY-MM-DD para
+ * evitar drift de milissegundos/timezone em comparacoes de Date.
  */
-export function computeDueDate(referenceMonth: string, dueDay: number): Date {
+export function isFeeOverdue(referenceMonth: string, dueDay: number): boolean {
   const [year, month] = referenceMonth.split("-").map(Number);
-  return new Date(year, month - 1, dueDay, 23, 59, 59);
+  const dueDateStr = `${year}-${String(month).padStart(2, "0")}-${String(dueDay).padStart(2, "0")}`;
+  return todayISO() > dueDateStr;
 }
