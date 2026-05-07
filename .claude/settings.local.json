@@ -22,7 +22,8 @@
       "Bash(npm list *)",
       "Bash(npm audit *)",
       "Bash(git rm *)",
-      "Bash(grep -i \".csv$\")"
+      "Bash(grep -i \".csv$\")",
+      "Bash(git commit *)"
     ]
   }
 }
